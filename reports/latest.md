@@ -1,0 +1,43 @@
+# Performance tracker - 2026-08-28   (reconciled through 2026-08-27)
+
+## ALERTS
+- SCALE 2026-08-28: no usable run record; previous scale carried forward.
+- SCALE CHANGE on 2026-08-27: now 0.2.
+- SLIPPAGE 2026-08-27: 2 unbenchmarked leg(s), +250 CNY exec cost without a shipped decision price.
+
+## Latest reconciled day (2026-08-27)
+live gross -510 | expected (0.2 x bt +24,247) = +4,849 | gap -5,359
+  exec_cost -1,615 (slip -1,865, unbench +250) | marking -625 | bookdiff -1,651 (carry -881, new -770) | residual -6,247 | broker basis +1,548
+  fees +1,038 | broker residual -740 -> live net -2,288
+
+## Cumulative bridge (live since 2026-08-18, 8 reconciled days)
+| expected | -exec | +marking | +bookdiff | +resid | +broker basis | = live gross | -fees | +broker_resid | = live net |
+|---|---|---|---|---|---|---|---|---|---|
+| +8,902 | +840 | -130 | -864 | -4,002 | -1,517 | +3,230 | -1,713 | -583 | +934 |
+
+## Stats (daily CNY pnl)
+| window | days | total | sharpe | mdd | hit |
+|---|---|---|---|---|---|
+| live net live-to-date | 8 | +934 | 0.92 | -3,260 | 38% | (small sample)
+| live net last-20d | 8 | +934 | 0.92 | -3,260 | 38% | (small sample)
+| live net 2026-YTD | 8 | +934 | 0.92 | -3,260 | 38% | (small sample)
+| bt scaled live-to-date | 8 | +8,902 | 6.56 | -3,685 | 88% | (small sample)
+| bt scaled last-20d | 8 | +8,902 | 6.56 | -3,685 | 88% | (small sample)
+| bt scaled 2026-YTD | 8 | +8,902 | 6.56 | -3,685 | 88% | (small sample)
+
+## Per strategy
+| strategy | live? | bt 2026 pnl (full) | bt scaled (live window) | live attributed | note |
+|---|---|---|---|---|---|
+| Calendar main pool (branch) | yes | +409,045 | +9,283 | -1,325 | exclusive-holder attribution |
+| Fundamental factor | yes | +588,324 | -381 | -325 | exclusive-holder attribution |
+| Cross-product pairs | no | +83,765 | - | - | source configured, not executing |
+| Calendar extended pool | no | +619,730 | - | - | not shipped yet |
+| Chemical fundamental | no | +408,520 | - | - | not shipped yet |
+| Agriculture event-driven | no | +127,735 | - | - | not shipped yet |
+| Factor-neutral stat arb | no | +253,399 | - | - | not shipped yet |
+| shared bucket (both books) | - | - | - | +8,935 | not attributable |
+| neither bucket (no target) | - | - | - | -2,538 | inherited/manual |
+
+## Data health
+scale: 0.2 (since 2026-08-27)
+inbox ks summary mtime: 2026-08-28 05:51 UTC

@@ -1,0 +1,97 @@
+{
+  "backtest_fingerprints": {
+    "agri_event": {
+      "last_date": "2026-08-28",
+      "n_rows": 154,
+      "sha256": "da24cf6ecaebd83cba1804fe207b4667087327705b89e2ae1e79b17d50bcfb24"
+    },
+    "chem_fund": {
+      "last_date": "2026-08-28",
+      "n_rows": 154,
+      "sha256": "0c889d28f987511402ae01bdf8eb8ce36dea2089577e2f2411ad1a7c750da902"
+    },
+    "china_pairs": {
+      "last_date": "2026-08-28",
+      "n_rows": 153,
+      "sha256": "9e089c9c6aeb09fe02145744f157f9b09d65dde1a8f52e9ef70ad3e43bc1abe0"
+    },
+    "fund_v3": {
+      "last_date": "2026-08-28",
+      "n_rows": 154,
+      "sha256": "a18c6b37d7bd3cc63770debdac857b91c8ea55b50a2fce84ce27795eb4390546"
+    },
+    "ks_branch": {
+      "last_date": "2026-08-28",
+      "n_rows": 154,
+      "sha256": "9d481d887773dc9bdbf515fb384d8c721a3daf9a54c2c8206ad77454f4d50a62"
+    },
+    "ks_ext": {
+      "last_date": "2026-08-28",
+      "n_rows": 153,
+      "sha256": "11aefdc7a0bd7a188f727b6e0a7c4a588cb305ab9953df6a103d3df365bfe245"
+    },
+    "stat_arb": {
+      "last_date": "2026-08-27",
+      "n_rows": 153,
+      "sha256": "a0c3b1573b6d2ac45a24746cb392022eb60340f2d1421e27e5965700cd43b550"
+    }
+  },
+  "last_run": {
+    "at": "2026-08-28T21:17:43+00:00",
+    "n_alerts": 3,
+    "reconciled_through": "2026-08-27"
+  },
+  "missing_live_days": [],
+  "scale_history": [
+    {
+      "date": "2026-08-18",
+      "flags": [],
+      "scale": 0.05
+    },
+    {
+      "date": "2026-08-19",
+      "flags": [],
+      "scale": 0.05
+    },
+    {
+      "date": "2026-08-20",
+      "flags": [
+        "null_scale_run"
+      ],
+      "scale": 0.05
+    },
+    {
+      "date": "2026-08-21",
+      "flags": [],
+      "scale": 0.05
+    },
+    {
+      "date": "2026-08-24",
+      "flags": [],
+      "scale": 0.05
+    },
+    {
+      "date": "2026-08-25",
+      "flags": [],
+      "scale": 0.05
+    },
+    {
+      "date": "2026-08-26",
+      "flags": [],
+      "scale": 0.05
+    },
+    {
+      "date": "2026-08-27",
+      "flags": [],
+      "scale": 0.2
+    },
+    {
+      "date": "2026-08-28",
+      "flags": [
+        "null_scale_run",
+        "scale_carried_forward"
+      ],
+      "scale": 0.2
+    }
+  ]
+}
