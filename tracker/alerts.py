@@ -15,8 +15,22 @@ from .dates import as_date, business_days_between, is_weekday, normalize_date
 
 def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame,
               state: dict, bt_series: dict[str, pd.DataFrame],
-              today: str) -> list[str]:
+              today: str, pin_div: dict | None = None) -> list[str]:
     alerts: list[str] = []
+
+    # -- current series vs pinned as-shipped values -----------------------
+    # Each newly-divergent date is announced once; the standing count lives
+    # in the report's Data health section, not here (no permanent alarm).
+    announced = state.setdefault("bt_pin_divergence_announced", {})
+    for src, e in (pin_div or {}).items():
+        seen = set(announced.get(src, []))
+        fresh = [d for d in e["dates"] if d not in seen]
+        if fresh:
+            alerts.append(f"BT REVISED vs PINS: {src} current history differs "
+                          f"from pinned as-shipped values on {len(fresh)} new "
+                          f"live-window day(s) (max |diff| {e['max_abs']:.0f} "
+                          f"CNY, first {fresh[0]}); the bridge keeps the pins.")
+        announced[src] = sorted(seen | set(e["dates"]))
 
     # -- missing live days (sticky) --------------------------------------
     known = set(state.get("missing_live_days", []))

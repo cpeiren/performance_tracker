@@ -52,6 +52,64 @@ def bt_gross_for_bridge() -> pd.DataFrame:
     return out
 
 
+def pin_divergence(bt_raw: pd.DataFrame, state: dict) -> dict:
+    """Where the CURRENT series disagrees with pinned as-shipped values.
+
+    Returns {source: {"dates": [...], "max_abs": float}} for diffs > 1 CNY.
+    A full model regeneration upstream shows up here permanently; the bridge
+    keeps the pins, and alerts announce each newly-divergent date once.
+    """
+    out: dict = {}
+    pins = state.get("bt_pinned", {})
+    for d, vals in pins.items():
+        for src, pinned in vals.items():
+            if src not in bt_raw.columns or d not in bt_raw.index:
+                continue
+            cur = bt_raw.loc[d, src]
+            if pd.isna(cur):
+                continue
+            diff = abs(float(cur) - float(pinned))
+            if diff > 1.0:
+                e = out.setdefault(src, {"dates": [], "max_abs": 0.0})
+                e["dates"].append(d)
+                e["max_abs"] = max(e["max_abs"], diff)
+    for e in out.values():
+        e["dates"].sort()
+    return out
+
+
+def overlay_and_update_pins(bt: pd.DataFrame, state: dict) -> tuple[pd.DataFrame, int]:
+    """As-shipped basis for the bridge: pin each live-window day's backtest
+    value the first run after it matures, and never follow later revisions.
+
+    A day is mature once the series extends past it (date < series max) --
+    the provisional same-day row regenerates next morning, so the value seen
+    then is the final one from the model that actually shipped that day's
+    targets.  Pinned values overlay the current series; upstream history
+    regenerations (model changes) therefore cannot rewrite already-reconciled
+    days.  Returns (bt with pins applied, n newly pinned).
+    """
+    pins = state.setdefault("bt_pinned", {})
+    new = 0
+    for src in ("ks", "fundamental"):
+        if src not in bt.columns:
+            continue
+        ser = bt[src].dropna()
+        if not len(ser):
+            continue
+        mx = ser.index.max()
+        for d, v in ser.items():
+            if d < C.LIVE_START or d >= mx:
+                continue
+            if src not in pins.setdefault(d, {}):
+                pins[d][src] = float(v)
+                new += 1
+    for d, vals in pins.items():
+        for src, v in vals.items():
+            bt.loc[d, src] = v
+    return bt.sort_index(), new
+
+
 def series_fingerprint(df: pd.DataFrame, exclude_last_n: int = 5) -> dict:
     """Revision detector: hash of all rows except the trailing few.
 

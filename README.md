@@ -35,6 +35,10 @@ The bridge (account-level, gross):
                + broker_basis
   live_net   = live_gross - fees + broker_residual
 Missing live days accrue into a sticky bucket and are excluded from cum sums.
+As-shipped basis: each live day's backtest inputs are PINNED (data/state.json
+bt_pinned) once the day matures; upstream history regenerations (model
+updates) never rewrite already-reconciled days -- divergence is alerted once
+and counted in Data health.
 Alerts (top of every report): missing days, stale inbox, scale changes,
 backtest history revisions, unbenchmarked slippage, broker diffs, residual
 blowouts, ship staleness, ks cross-check.

@@ -59,7 +59,12 @@ def main(argv=None) -> int:
 
     state = io_backtest.load_state()
     bt_series = io_backtest.all_series()
-    bt = io_backtest.bt_gross_for_bridge()
+    bt_raw = io_backtest.bt_gross_for_bridge()
+    # divergence vs EXISTING pins first, then pin newly-matured days + overlay
+    pin_div = io_backtest.pin_divergence(bt_raw, state)
+    bt, n_new_pins = io_backtest.overlay_and_update_pins(bt_raw.copy(), state)
+    if n_new_pins:
+        print(f"pinned {n_new_pins} new as-shipped backtest value(s)")
 
     scales_df = compute_scales()
     scales = scales_df.set_index("date")["scale"] if len(scales_df) else pd.Series(dtype=float)
@@ -82,11 +87,15 @@ def main(argv=None) -> int:
         k: False for k in C.STRATEGIES}
 
     alert_list = problems + A.check_all(recon, missing, scales_df, state,
-                                        bt_series, today)
+                                        bt_series, today, pin_div=pin_div)
 
+    pin_info = {
+        "n_days": len(state.get("bt_pinned", {})),
+        "divergent": {s: len(e["dates"]) for s, e in pin_div.items()},
+    }
     report.write_report(today, recon, state.get("missing_live_days", []),
                         missing_bucket, scales_df, attribution, bt_series,
-                        flags, alert_list)
+                        flags, alert_list, bt_bridge=bt, pin_info=pin_info)
     print(f"report: reports/daily/{today}.md (+ latest.md/png)")
 
     state["scale_history"] = [

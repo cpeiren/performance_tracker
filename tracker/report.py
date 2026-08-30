@@ -32,7 +32,9 @@ def _stat_row(name: str, p: dict) -> str:
 def write_report(day: str, recon: pd.DataFrame, missing: list[str],
                  missing_bucket: float, scales: pd.DataFrame,
                  attribution: pd.DataFrame, bt_series: dict[str, pd.DataFrame],
-                 live_flags: dict[str, bool], alerts: list[str]) -> None:
+                 live_flags: dict[str, bool], alerts: list[str],
+                 bt_bridge: pd.DataFrame | None = None,
+                 pin_info: dict | None = None) -> None:
     md_path = C.DAILY_DIR / f"{day}.md"
     png_path = C.DAILY_DIR / f"{day}.png"
 
@@ -109,13 +111,14 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
         note = ""
         if is_live and source and len(live):
             sser = live["scale"]
-            col = "ks" if source == "ks" else source
-            if key == "ks_branch":
-                from . import io_live
-                bts = io_live.inbox_ks_summary()
-                aligned = bts["gross_pnl_shipped"].reindex(live.index).fillna(0.0)
-            else:
-                aligned = df["gross_pnl"].reindex(live.index).fillna(0.0) if len(df) else None
+            # scaled column comes from the (pinned) bridge frame so the
+            # per-strategy rows foot against the bridge's expected
+            col = "ks" if source == "ks" else "fundamental" if source == "fundamental" else None
+            aligned = None
+            if bt_bridge is not None and col is not None and col in bt_bridge.columns:
+                aligned = bt_bridge[col].reindex(live.index).fillna(0.0)
+            elif len(df):
+                aligned = df["gross_pnl"].reindex(live.index).fillna(0.0)
             if aligned is not None:
                 scaled = _f((aligned * sser).sum())
             if len(attribution) and source in attribution.columns:
@@ -141,6 +144,10 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
         if cur is not None:
             since = scales[scales["scale"] == cur["scale"]]["date"].min()
             a(f"scale: {cur['scale']:g} (since {since})")
+    if pin_info:
+        div = ", ".join(f"{s}: {n}" for s, n in pin_info.get("divergent", {}).items())
+        a(f"as-shipped pins: {pin_info.get('n_days', 0)} live day(s) pinned"
+          + (f"; current series diverges on {div}" if div else ""))
     from . import io_live as _il
     mt = _il.inbox_ks_summary_mtime()
     if mt:
