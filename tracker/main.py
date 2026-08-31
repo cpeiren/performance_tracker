@@ -69,7 +69,27 @@ def main(argv=None) -> int:
     scales_df = compute_scales()
     scales = scales_df.set_index("date")["scale"] if len(scales_df) else pd.Series(dtype=float)
 
-    recon, missing = reconcile.bridge_all(bt, scales)
+    # -- regime per day: forward once the merged book feeds pyexec ---------
+    scale_days = set(scales_df["date"]) if len(scales_df) else set()
+    days_needed = sorted({d for d in bt.index if d >= C.LIVE_START} | scale_days)
+    raw_fwd = {d: io_live.is_forward_day(d) for d in days_needed}
+    fwd_dates = sorted(d for d, v in raw_fwd.items() if v)
+    first_fwd = fwd_dates[0] if fwd_dates else None
+    # a day with no run records at all (holiday gap, lost file) keeps the
+    # standing regime rather than flipping back to legacy
+    forward_flags = {
+        d: raw_fwd[d] or (first_fwd is not None and d >= first_fwd
+                          and not io_live.run_records(d))
+        for d in days_needed}
+    if first_fwd:
+        print(f"forward regime since {first_fwd} "
+              f"({len(fwd_dates)} day(s) with forward runs)")
+
+    weights_hist = io_backtest.weights_history()
+    bt_weighted, weight_problems = reconcile.weighted_bt(bt, forward_flags,
+                                                         weights_hist)
+
+    recon, missing = reconcile.bridge_all(bt_weighted, scales, forward_flags)
     if len(recon):
         recon.to_csv(C.RECON_CSV)
         print(f"reconciled {len(recon)} day(s): {recon.index[0]} -> {recon.index[-1]}")
@@ -79,15 +99,17 @@ def main(argv=None) -> int:
     missing_bucket = 0.0
     for d in missing:
         s = scales.get(d)
-        if s is not None and not pd.isna(s) and d in bt.index:
-            missing_bucket += float(s) * float(bt.loc[d].fillna(0.0).sum())
+        if s is not None and not pd.isna(s) and d in bt_weighted.index:
+            missing_bucket += float(s) * float(bt_weighted.loc[d].fillna(0.0).sum())
 
-    attribution = AT.attribute_all(list(recon.index)) if len(recon) else pd.DataFrame()
-    flags = AT.live_flags(list(recon.index)) if len(recon) else {
-        k: False for k in C.STRATEGIES}
+    attribution = (AT.attribute_all(list(recon.index), forward_flags, weights_hist)
+                   if len(recon) else pd.DataFrame())
+    flags = (AT.live_flags(list(recon.index), forward_flags, weights_hist)
+             if len(recon) else {k: False for k in C.STRATEGIES})
 
-    alert_list = problems + A.check_all(recon, missing, scales_df, state,
-                                        bt_series, today, pin_div=pin_div)
+    alert_list = problems + weight_problems + A.check_all(
+        recon, missing, scales_df, state, bt_series, today, pin_div=pin_div,
+        forward_flags=forward_flags, weights_hist=weights_hist)
 
     pin_info = {
         "n_days": len(state.get("bt_pinned", {})),
@@ -95,7 +117,9 @@ def main(argv=None) -> int:
     }
     report.write_report(today, recon, state.get("missing_live_days", []),
                         missing_bucket, scales_df, attribution, bt_series,
-                        flags, alert_list, bt_bridge=bt, pin_info=pin_info)
+                        flags, alert_list, bt_bridge=bt_weighted,
+                        pin_info=pin_info, weights_hist=weights_hist,
+                        forward_flags=forward_flags)
     print(f"report: reports/daily/{today}.md (+ latest.md/png)")
 
     state["scale_history"] = [

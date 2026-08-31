@@ -163,6 +163,19 @@ def executed_sources(day: str) -> set[str]:
     return out
 
 
+def is_forward_day(day: str) -> bool:
+    """True when the merged forward book fed any run on the day.
+
+    BLOCKED runs count: they still establish which book pyexec targeted
+    (the regime), even when nothing executed.
+    """
+    for rec in run_records(day):
+        for src in rec.get("sources") or []:
+            if src.get("source") == C.FORWARD_SOURCE:
+                return True
+    return False
+
+
 # --------------------------------------------------------------------------
 # Shipped books and decision prices (inbox)
 # --------------------------------------------------------------------------
@@ -185,7 +198,7 @@ def book(source: str, day: str) -> dict[str, float] | None:
 
 
 def combined_fullsize_book(day: str) -> tuple[dict[str, float], dict[str, dict[str, float]]]:
-    """Sum of the live sources' full-size books, plus the per-source books."""
+    """LEGACY-day book: sum of the per-source full-size books, plus each."""
     per: dict[str, dict[str, float]] = {}
     total: dict[str, float] = {}
     for src in C.LIVE_BOOK_SOURCES:
@@ -198,8 +211,20 @@ def combined_fullsize_book(day: str) -> tuple[dict[str, float], dict[str, dict[s
     return total, per
 
 
-def snap_prices(day: str, snap: str) -> dict[str, float] | None:
-    p = C.INBOX / "ks" / "meta" / f"snap_prices_{normalize_date(day)}_{snap}.json"
+def fullsize_book_for_bridge(day: str, forward: bool) -> dict[str, float]:
+    """The full-size book pyexec actually targeted (scale applies on top).
+
+    FORWARD days: the merged weighted book from inbox/forward -- weights are
+    already inside it.  LEGACY days: ks + fundamental summed, unweighted.
+    """
+    if forward:
+        return book(C.FORWARD_SOURCE, day) or {}
+    total, _ = combined_fullsize_book(day)
+    return total
+
+
+def snap_prices(day: str, snap: str, source: str = "ks") -> dict[str, float] | None:
+    p = C.INBOX / source / "meta" / f"snap_prices_{normalize_date(day)}_{snap}.json"
     if not p.exists():
         return None
     with open(p) as fh:
@@ -233,16 +258,21 @@ def fund_prices(day: str) -> dict[str, float]:
 
 
 def bench_prices(day: str) -> dict[str, float]:
-    """End-of-day decision price per ticker: latest ks snap, then fund price.
+    """End-of-day decision price per ticker: latest snap, then fund price.
 
-    A contract with no decision price falls back to its settle downstream,
-    which zeroes its marking term by construction.
+    Snap files are tried from the forward meta first (the only set guaranteed
+    once the legacy per-source ships stop at Phase 5), then the legacy ks
+    meta.  A contract with no decision price falls back to its settle
+    downstream, which zeroes its marking term by construction.
     """
     out: dict[str, float] = {}
-    for snap in C.SNAP_PREFERENCE:  # first snap file that exists is the EOD set
-        prices = snap_prices(day, snap)
-        if prices:
-            out.update(prices)
+    for source in (C.FORWARD_SOURCE, "ks"):
+        for snap in C.SNAP_PREFERENCE:  # first snap that exists is the EOD set
+            prices = snap_prices(day, snap, source=source)
+            if prices:
+                out.update(prices)
+                break
+        if out:
             break
     for t, px in fund_prices(day).items():
         out.setdefault(t, px)

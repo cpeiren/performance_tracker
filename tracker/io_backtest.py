@@ -3,9 +3,10 @@ series that already arrives in the inbox.
 
 Canonical per-strategy file ``data/backtest/<strategy>.csv``:
     date,gross_pnl,traded_notional,shipped_at
-Full-size CNY, ISO dates, 2026 onward.  ``fund_v3`` and ``ks_branch`` are the
-two series the account-level bridge consumes (scaled by the day's execution
-scale); the other five are report-only until they ship.
+Full-size CNY, ISO dates, 2026 onward.  The bridge consumes ALL seven series
+(weighted per day on forward days, ks+fund unweighted on legacy days).  The
+ship script also delivers the forward merge's per-day weights and per-source
+component books; both are stored first-write-wins (as-shipped pins on disk).
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import pandas as pd
 
 import config as C
 from .dates import normalize_date
-from . import io_live
+from . import io_live, names
 
 
 def load_series(strategy: str) -> pd.DataFrame:
@@ -35,20 +36,77 @@ def all_series() -> dict[str, pd.DataFrame]:
 
 
 def bt_gross_for_bridge() -> pd.DataFrame:
-    """date x {ks, fundamental} full-size backtest gross P&L for the bridge.
+    """date x strategy-key full-size backtest gross P&L for the bridge.
 
-    ks comes from the INBOX series (arrives with no workstation in the loop);
-    the ship-script ks_branch series is only a cross-check.  fundamental comes
-    from the shipped fund_v3 series -- it does not arrive any other way.
+    One column per strategy.  ks_branch prefers the INBOX series (arrives
+    with no workstation in the loop, and same-day) with the shipped series
+    filling dates the inbox lacks -- e.g. after the legacy per-source ships
+    stop at Phase 5.  Every other strategy comes from its shipped series.
     """
+    cols: dict[str, pd.Series] = {}
+    for key in C.STRATEGIES:
+        df = load_series(key)
+        if len(df):
+            cols[key] = df["gross_pnl"]
     ks = io_live.inbox_ks_summary()
-    fund = load_series("fund_v3")
-    out = pd.DataFrame(index=sorted(set(ks.index) | set(fund.index)))
-    out.index.name = "date"
     if len(ks):
-        out["ks"] = ks["gross_pnl_shipped"]
-    if len(fund):
-        out["fundamental"] = fund["gross_pnl"]
+        inbox_ser = ks["gross_pnl_shipped"]
+        shipped = cols.get("ks_branch")
+        cols["ks_branch"] = (inbox_ser if shipped is None
+                             else inbox_ser.combine_first(shipped))
+    out = pd.DataFrame(cols)
+    out.index.name = "date"
+    return out.sort_index()
+
+
+# --------------------------------------------------------------------------
+# Forward merge weights and component books (shipped, first-write-wins)
+# --------------------------------------------------------------------------
+
+def weights_history() -> dict[str, dict[str, float]]:
+    """{date: {strategy_key: weight}} from data/forward/weights/<date>.json."""
+    out: dict[str, dict[str, float]] = {}
+    for p in sorted(C.FORWARD_WEIGHTS_DIR.glob("*.json")):
+        with open(p) as fh:
+            raw = json.load(fh)
+        w = {C.FORWARD_SRC_TO_STRATEGY[src]: float(v)
+             for src, v in raw.items()
+             if src in C.FORWARD_SRC_TO_STRATEGY and isinstance(v, (int, float))}
+        if w:
+            out[p.stem] = w
+    return out
+
+
+def weights_for_day(day: str, hist: dict[str, dict[str, float]]
+                    ) -> tuple[dict[str, float] | None, bool]:
+    """(weights, exact) for a forward day: the day's own shipped weights, or
+    the latest earlier day's carried forward (exact=False), or None."""
+    if day in hist:
+        return hist[day], True
+    earlier = [d for d in hist if d < day]
+    if earlier:
+        return hist[max(earlier)], False
+    return None, False
+
+
+def component_books(day: str) -> dict[str, dict[str, float]]:
+    """{strategy_key: {ticker: full-size lots}} shipped for one forward day."""
+    out: dict[str, dict[str, float]] = {}
+    for p in C.FORWARD_BOOKS_DIR.glob(f"{day}__*.json"):
+        src = p.stem.split("__", 1)[1]
+        key = C.FORWARD_SRC_TO_STRATEGY.get(src)
+        if key is None:
+            continue
+        with open(p) as fh:
+            raw = json.load(fh)
+        b: dict[str, float] = {}
+        for human, lots in raw.items():
+            try:
+                t = names.preferred_ticker(human)
+            except ValueError:
+                continue
+            b[t] = b.get(t, 0.0) + float(lots)
+        out[key] = b
     return out
 
 
@@ -91,9 +149,7 @@ def overlay_and_update_pins(bt: pd.DataFrame, state: dict) -> tuple[pd.DataFrame
     """
     pins = state.setdefault("bt_pinned", {})
     new = 0
-    for src in ("ks", "fundamental"):
-        if src not in bt.columns:
-            continue
+    for src in bt.columns:
         ser = bt[src].dropna()
         if not len(ser):
             continue
@@ -127,12 +183,27 @@ def series_fingerprint(df: pd.DataFrame, exclude_last_n: int = 5) -> dict:
     }
 
 
+_LEGACY_PIN_KEYS = {"ks": "ks_branch", "fundamental": "fund_v3"}
+
+
 def load_state() -> dict:
     if C.STATE_JSON.exists():
         with open(C.STATE_JSON) as fh:
-            return json.load(fh)
-    return {"backtest_fingerprints": {}, "scale_history": [],
-            "missing_live_days": [], "last_run": {}}
+            state = json.load(fh)
+    else:
+        return {"backtest_fingerprints": {}, "scale_history": [],
+                "missing_live_days": [], "last_run": {}}
+    # migrate pre-forward pin keys (bridge columns were ks/fundamental) to
+    # strategy keys; idempotent, values untouched
+    for d, vals in state.get("bt_pinned", {}).items():
+        for old, new in _LEGACY_PIN_KEYS.items():
+            if old in vals:
+                vals.setdefault(new, vals.pop(old))
+    ann = state.get("bt_pin_divergence_announced", {})
+    for old, new in _LEGACY_PIN_KEYS.items():
+        if old in ann:
+            ann.setdefault(new, ann.pop(old))
+    return state
 
 
 def save_state(state: dict) -> None:

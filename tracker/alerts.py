@@ -15,8 +15,41 @@ from .dates import as_date, business_days_between, is_weekday, normalize_date
 
 def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame,
               state: dict, bt_series: dict[str, pd.DataFrame],
-              today: str, pin_div: dict | None = None) -> list[str]:
+              today: str, pin_div: dict | None = None,
+              forward_flags: dict[str, bool] | None = None,
+              weights_hist: dict[str, dict[str, float]] | None = None) -> list[str]:
     alerts: list[str] = []
+    forward_flags = forward_flags or {}
+    weights_hist = weights_hist or {}
+
+    # -- forward merge weights --------------------------------------------
+    wdays = sorted(weights_hist)
+    for prev_d, d in zip(wdays, wdays[1:]):
+        if weights_hist[d] != weights_hist[prev_d]:
+            changed = {k: (weights_hist[prev_d].get(k), weights_hist[d].get(k))
+                       for k in set(weights_hist[prev_d]) | set(weights_hist[d])
+                       if weights_hist[prev_d].get(k) != weights_hist[d].get(k)}
+            desc = ", ".join(f"{k}: {a}->{b}" for k, (a, b) in sorted(changed.items()))
+            alerts.append(f"WEIGHTS CHANGE on {d}: {desc}.")
+
+    # -- forward-day shipped inputs ---------------------------------------
+    fwd_recon = [d for d in recon.index if forward_flags.get(d)] if len(recon) else []
+    if fwd_recon:
+        last_fwd = fwd_recon[-1]
+        books = io_backtest.component_books(last_fwd)
+        if not books:
+            alerts.append(f"FORWARD BOOKS {last_fwd}: no component books "
+                          f"shipped -- per-strategy attribution is empty; run "
+                          f"the ship script.")
+        else:
+            missing_src = [k for k in C.STRATEGIES if k not in books]
+            if missing_src:
+                alerts.append(f"FORWARD BOOKS {last_fwd}: missing component "
+                              f"book(s) {', '.join(missing_src)}.")
+        if not io_live.book(C.FORWARD_SOURCE, last_fwd):
+            alerts.append(f"FORWARD BOOK {last_fwd}: merged book absent from "
+                          f"inbox/forward -- ideal book fell back to empty; "
+                          f"bookdiff terms are wrong for that day.")
 
     # -- current series vs pinned as-shipped values -----------------------
     # Each newly-divergent date is announced once; the standing count lives
@@ -43,13 +76,20 @@ def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame
                       f"expected pnl held in the missing-day bucket.")
 
     # -- inbox ks summary freshness --------------------------------------
+    # Once the legacy per-source ships stop (Phase 5) this file goes stale
+    # permanently and the bridge's ks_branch column falls back to the shipped
+    # series -- only alert while the inbox is still the freshest ks source.
     mt = io_live.inbox_ks_summary_mtime()
+    ks_shipped = bt_series.get("ks_branch", pd.DataFrame())
+    inbox_ks = io_live.inbox_ks_summary()
+    shipped_covers = (len(ks_shipped) and len(inbox_ks)
+                      and ks_shipped.index.max() >= inbox_ks.index.max())
     if mt is None:
         alerts.append("INBOX: ks/meta/summary.csv is MISSING.")
     else:
         age_h = (dt.datetime.now(dt.timezone.utc)
                  - dt.datetime.fromtimestamp(mt, dt.timezone.utc)).total_seconds() / 3600
-        if is_weekday(today) and age_h > 30:
+        if is_weekday(today) and age_h > 30 and not shipped_covers:
             alerts.append(f"INBOX: ks/meta/summary.csv is stale ({age_h:.0f}h old).")
 
     # -- scale changes / null-scale days ---------------------------------

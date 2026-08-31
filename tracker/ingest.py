@@ -2,9 +2,13 @@
 
 A payload is a directory ``incoming/payload_<ts>/`` containing per-strategy
 CSVs (``<strategy>.csv`` with columns strategy,date,gross_pnl,traded_notional)
-and a ``manifest.json`` with per-file sha256 and row counts.  Validation
-failures reject the WHOLE payload (moved to incoming/rejected_<ts>) -- no
-partial promotion.  Promotion is atomic per file (tmp + rename).
+and a ``manifest.json`` with per-file sha256 and row counts.  Payloads may
+also carry a ``forward`` section: the merge weights file plus the per-source
+full-size component books for one book date; those promote first-write-wins
+into data/forward/ (as-shipped pins on disk -- a re-ship that differs is a
+problem message, never an overwrite).  Validation failures reject the WHOLE
+payload (moved to incoming/rejected_<ts>) -- no partial promotion.
+Promotion is atomic per file (tmp + rename).
 """
 
 from __future__ import annotations
@@ -25,6 +29,43 @@ def _sha256(path) -> str:
         for chunk in iter(lambda: fh.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _pin_file(src_path, dest, label: str) -> list[str]:
+    """First write wins; a differing re-ship is reported, never applied."""
+    if dest.exists():
+        if _sha256(dest) != _sha256(src_path):
+            return [f"{label}: re-shipped with different content than the "
+                    f"pinned copy -- kept the pin ({dest.name})"]
+        return []
+    tmp = dest.with_suffix(dest.suffix + ".tmp")
+    shutil.copyfile(src_path, tmp)
+    tmp.replace(dest)
+    return []
+
+
+def _promote_forward(pay, fwd: dict) -> list[str]:
+    """Store a payload's forward weights + component books, first-write-wins."""
+    problems: list[str] = []
+    date = fwd.get("book_date")
+    if not date:
+        return problems
+    date = normalize_date(date)
+    wname = fwd.get("weights")
+    if wname and (pay / wname).exists():
+        problems += _pin_file(pay / wname, C.FORWARD_WEIGHTS_DIR / f"{date}.json",
+                              f"{pay.name}/weights {date}")
+    for src, fname in (fwd.get("books") or {}).items():
+        if src not in C.FORWARD_SRC_TO_STRATEGY:
+            problems.append(f"{pay.name}/{fname}: unknown forward source "
+                            f"'{src}' -- skipped")
+            continue
+        if not (pay / fname).exists():
+            continue  # manifest validation already flagged it
+        problems += _pin_file(pay / fname,
+                              C.FORWARD_BOOKS_DIR / f"{date}__{src}.json",
+                              f"{pay.name}/book {src} {date}")
+    return problems
 
 
 def promote_incoming() -> tuple[list[str], list[str]]:
@@ -55,7 +96,13 @@ def promote_incoming() -> tuple[list[str], list[str]]:
             pay.rename(C.INCOMING / f"rejected_{pay.name}")
             continue
         shipped_at = man.get("generated_at", "")
+        fwd = man.get("forward") or {}
+        fwd_files = set(fwd.get("books", {}).values()) | (
+            {fwd["weights"]} if fwd.get("weights") else set())
+        problems += _promote_forward(pay, fwd)
         for fname in man.get("files", {}):
+            if fname in fwd_files:
+                continue
             strategy = fname.rsplit(".", 1)[0]
             if strategy not in C.STRATEGIES:
                 problems.append(f"{pay.name}/{fname}: unknown strategy -- skipped")

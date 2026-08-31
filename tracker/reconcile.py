@@ -3,12 +3,15 @@
 Account-level, GROSS (fees are shown separately -- the backtest is gross).
 Per trading day D and contract c with multiplier m_c:
 
-    fullsize_c(D)  = ks_book_c(D) + fund_book_c(D)     dated inbox files
+    fullsize_c(D)  = LEGACY days: ks_book_c(D) + fund_book_c(D)
+                     FORWARD days (2026-08-31 on): forward_book_c(D), the
+                     merged weighted book pyexec actually targeted
     ideal_c(D)     = scale_D * fullsize_c(D)
     dbook_c(D)     = live_net_c(D) - ideal_c(D)
     bench_c(D)     = EOD decision price (1330 snap, fund price, else settle)
 
-    expected_D          = scale_D * (bt_ks_D + bt_fund_D)
+    expected_D          = scale_D * sum_i w_i(D) * bt_i(D)
+                          (legacy days: w = 1 on ks_branch + fund_v3 only)
     exec_cost_D         = slip_total_D + exec_unbenchmarked_D    (+ = cost)
     marking_D           = basis(D) - basis(D-1)
         basis(D) = sum_c live_net_c(D) * (settle_c(D) - bench_c(D)) * m_c
@@ -68,13 +71,17 @@ def _all_tickers(*dicts) -> set[str]:
 
 
 def bridge_day(day: str, prev_day: str | None, scale: float,
-               bt_gross: float, prev_scale: float | None = None) -> dict | None:
+               bt_gross: float, prev_scale: float | None = None,
+               forward: bool = False, prev_forward: bool = False) -> dict | None:
     """One day's bridge terms.  Returns None when the day has no live state.
 
-    ``bt_gross`` is the FULL-SIZE combined backtest gross for the day (ks +
-    fundamental); ``scale`` the day's execution scale; ``prev_scale`` the
-    previous live day's scale (defaults to today's), used to price yesterday's
-    standing book difference at yesterday's ideal.
+    ``bt_gross`` is the FULL-SIZE combined backtest gross for the day --
+    ks + fundamental unweighted on legacy days, the weighted sum of all
+    shipped series on forward days (matching the weighted merged book);
+    ``scale`` the day's execution scale; ``prev_scale`` the previous live
+    day's scale (defaults to today's), used to price yesterday's standing
+    book difference at yesterday's ideal.  ``forward``/``prev_forward``
+    select which full-size book the ideal is built from.
     """
     st = io_live.state(day)
     if st is None:
@@ -86,12 +93,13 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
     mult = _multipliers(st)
     bench = io_live.bench_prices(day)
 
-    full, _per = io_live.combined_fullsize_book(day)
+    full = io_live.fullsize_book_for_bridge(day, forward)
 
     prev_pos = io_live.live_positions(st_prev) if st_prev else {}
     prev_settle = io_live.settles(st_prev) if st_prev else {}
     prev_mult = _multipliers(st_prev) if st_prev else {}
-    prev_full, _ = io_live.combined_fullsize_book(prev_day) if prev_day else ({}, {})
+    prev_full = (io_live.fullsize_book_for_bridge(prev_day, prev_forward)
+                 if prev_day else {})
     if prev_scale is None:
         prev_scale = scale
 
@@ -180,6 +188,7 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
 
     return {
         "date": normalize_date(day),
+        "regime": "forward" if forward else "legacy",
         "scale": scale,
         "bt_gross_fullsize": bt_gross,
         "expected": expected,
@@ -203,11 +212,53 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
     }
 
 
-def bridge_all(bt: pd.DataFrame, scales: pd.Series) -> tuple[pd.DataFrame, list[str]]:
+def weighted_bt(bt: pd.DataFrame, forward_flags: dict[str, bool],
+                weights_hist: dict[str, dict[str, float]]
+                ) -> tuple[pd.DataFrame, list[str]]:
+    """Per-day WEIGHTED full-size backtest frame for the live window.
+
+    date x strategy-key, value = w_i(day) * bt_i(day).  Legacy days weight
+    ks_branch + fund_v3 at 1 and everything else 0 (the account traded those
+    two books unweighted).  Forward days use the day's shipped merge weights,
+    carrying the latest earlier day's forward when the day's own are not
+    shipped yet.  Returns (frame, weight problem messages).
+    """
+    from . import io_backtest  # local import: avoid module cycle
+
+    problems: list[str] = []
+    days = [d for d in bt.index if d >= C.LIVE_START]
+    out = pd.DataFrame(0.0, index=days, columns=list(C.STRATEGIES))
+    out.index.name = "date"
+    for d in days:
+        if forward_flags.get(d):
+            w, exact = io_backtest.weights_for_day(d, weights_hist)
+            if w is None:
+                w = C.LEGACY_BRIDGE_WEIGHTS
+                problems.append(
+                    f"WEIGHTS {d}: forward day with no shipped merge weights "
+                    f"at all -- fell back to legacy ks+fund weighting; "
+                    f"expected is wrong until weights ship.")
+            elif not exact:
+                problems.append(
+                    f"WEIGHTS {d}: day's own merge weights not shipped yet -- "
+                    f"carried forward from an earlier day.")
+        else:
+            w = C.LEGACY_BRIDGE_WEIGHTS
+        for key, wi in w.items():
+            if key in bt.columns and wi:
+                v = bt.at[d, key] if d in bt.index else float("nan")
+                out.at[d, key] = wi * float(v) if pd.notna(v) else 0.0
+    return out, problems
+
+
+def bridge_all(bt_weighted: pd.DataFrame, scales: pd.Series,
+               forward_flags: dict[str, bool]) -> tuple[pd.DataFrame, list[str]]:
     """Bridge every live day present in daily_summary from LIVE_START on.
 
-    ``bt``: date x {ks, fundamental} full-size gross (io_backtest.bt_gross_for_bridge).
+    ``bt_weighted``: date x strategy-key WEIGHTED full-size gross (from
+    weighted_bt); a day's combined backtest gross is its row sum.
     ``scales``: date -> scale (from main's scale pass).
+    ``forward_flags``: date -> True when the merged forward book executed.
     Returns (frame indexed by date, missing-live trading days).
     """
     summ = io_live.daily_summary()
@@ -215,7 +266,7 @@ def bridge_all(bt: pd.DataFrame, scales: pd.Series) -> tuple[pd.DataFrame, list[
 
     # trading days = union of backtest dates in the live window; live gaps
     # inside it are the missing days the report must carry forever.
-    bt_days = [d for d in bt.index if d >= C.LIVE_START]
+    bt_days = [d for d in bt_weighted.index if d >= C.LIVE_START]
     missing = sorted(set(bt_days) - set(live_days))
     # exclude today-like trailing dates with backtest rows but no dailypnl YET
     # (dailypnl runs 16:00 CST): only count a day missing once a LATER live
@@ -227,11 +278,13 @@ def bridge_all(bt: pd.DataFrame, scales: pd.Series) -> tuple[pd.DataFrame, list[
     rows = []
     prev = None
     for day in live_days:
-        bt_row = bt.reindex([day]).fillna(0.0)
+        bt_row = bt_weighted.reindex([day]).fillna(0.0)
         bt_gross = float(bt_row.sum(axis=1).iloc[0]) if len(bt_row) else 0.0
         scale = float(scales.get(day, float("nan")))
         pscale = float(scales.get(prev)) if prev is not None and prev in scales.index else None
-        rec = bridge_day(day, prev, scale, bt_gross, prev_scale=pscale)
+        rec = bridge_day(day, prev, scale, bt_gross, prev_scale=pscale,
+                         forward=bool(forward_flags.get(day)),
+                         prev_forward=bool(forward_flags.get(prev)) if prev else False)
         if rec is not None:
             rows.append(rec)
         prev = day

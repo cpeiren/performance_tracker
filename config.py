@@ -8,6 +8,7 @@ files only and never imports cnexec code.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # --------------------------------------------------------------------------
@@ -15,7 +16,9 @@ from pathlib import Path
 # --------------------------------------------------------------------------
 
 TRACKER_ROOT = Path(__file__).resolve().parent
-CNEXEC = Path.home() / "cnexec"
+#: TRACKER_CNEXEC overrides the live-data root so the tracker can run
+#: against a pulled snapshot on another machine (testing only).
+CNEXEC = Path(os.environ.get("TRACKER_CNEXEC") or (Path.home() / "cnexec"))
 
 PNL_DIR = CNEXEC / "pnl"                       # daily_pnl_<D>.csv, daily_summary.csv, state_<D>.json
 ANALYSIS_DIR = CNEXEC / "analysis"             # exec_summary.csv, exec_daily_<D>.csv
@@ -25,12 +28,15 @@ INBOX = CNEXEC / "inbox"                       # ks/, fundamental/ (books + meta
 INCOMING = TRACKER_ROOT / "incoming"           # ship-script payloads land here
 DATA = TRACKER_ROOT / "data"
 BACKTEST_DIR = DATA / "backtest"               # canonical per-strategy series
+FORWARD_BOOKS_DIR = DATA / "forward" / "books"    # <date>__<src>.json (as-shipped, first write wins)
+FORWARD_WEIGHTS_DIR = DATA / "forward" / "weights"  # <date>.json (as-shipped, first write wins)
 RECON_CSV = DATA / "reconciliation.csv"
 STATE_JSON = DATA / "state.json"
 REPORT_DIR = TRACKER_ROOT / "reports"
 DAILY_DIR = REPORT_DIR / "daily"
 
-for _d in (INCOMING, BACKTEST_DIR, DAILY_DIR):
+for _d in (INCOMING, BACKTEST_DIR, FORWARD_BOOKS_DIR, FORWARD_WEIGHTS_DIR,
+           DAILY_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
 # --------------------------------------------------------------------------
@@ -53,8 +59,32 @@ STRATEGIES = {
 #: Inbox source -> strategy key (reverse of the live half of STRATEGIES).
 SOURCE_TO_STRATEGY = {v[1]: k for k, v in STRATEGIES.items() if v[1]}
 
-#: Sources whose dated full-size books feed the ideal-book construction.
+#: Sources whose dated full-size books feed the ideal-book construction on
+#: LEGACY days (account traded ks + fundamental per-source, unweighted).
 LIVE_BOOK_SOURCES = ("ks", "fundamental")
+
+# --------------------------------------------------------------------------
+# Forward regime (2026-08-31 cutover: one merged weighted book of all 7)
+# --------------------------------------------------------------------------
+
+#: pyexec inbox source name of the merged book.  A day is a FORWARD day when
+#: this source fed an executed run (never by date arithmetic).
+FORWARD_SOURCE = "forward"
+
+#: Merge-side source dir name (Execution/forward/inbox/<src>) -> strategy key.
+FORWARD_SRC_TO_STRATEGY = {
+    "ks":          "ks_branch",
+    "fundamental": "fund_v3",
+    "pairs":       "china_pairs",
+    "statarb":     "stat_arb",
+    "agri":        "agri_event",
+    "chem":        "chem_fund",
+    "ksext":       "ks_ext",
+}
+STRATEGY_TO_FORWARD_SRC = {v: k for k, v in FORWARD_SRC_TO_STRATEGY.items()}
+
+#: Bridge weights on LEGACY days: the two per-source books traded at weight 1.
+LEGACY_BRIDGE_WEIGHTS = {"ks_branch": 1.0, "fund_v3": 1.0}
 
 # --------------------------------------------------------------------------
 # Reconciliation conventions
