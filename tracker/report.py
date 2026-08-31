@@ -69,23 +69,28 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
           f"unbench {_f(last['exec_unbenchmarked'])}) | marking {_f(last['marking'])} | "
           f"bookdiff {_f(last['bookdiff_carry'] + last['bookdiff_creation'])} "
           f"(carry {_f(last['bookdiff_carry'])}, new {_f(last['bookdiff_creation'])}) | "
+          f"intraday {_f(last.get('intraday_unfilled', 0.0))} | "
           f"residual {_f(last['resid'])} | broker basis {_f(last['broker_basis'])}")
         a(f"  fees {_f(last['fees'])} | broker residual {_f(last['broker_resid'])} "
           f"-> live net {_f(last['live_net'])}")
         a("")
 
     if len(live):
+        if "intraday_unfilled" not in live.columns:
+            live = live.assign(intraday_unfilled=0.0)
         cum = live[["expected", "exec_cost", "marking", "bookdiff_carry",
-                    "bookdiff_creation", "resid", "broker_basis", "live_gross",
+                    "bookdiff_creation", "intraday_unfilled", "resid",
+                    "broker_basis", "live_gross",
                     "fees", "broker_resid", "live_net"]].sum()
         a(f"## Cumulative bridge (live since {C.LIVE_START}, "
           f"{len(live)} reconciled days)")
-        a("| expected | -exec | +marking | +bookdiff | +resid | +broker basis "
-          "| = live gross | -fees | +broker_resid | = live net |")
-        a("|---|---|---|---|---|---|---|---|---|---|")
+        a("| expected | -exec | +marking | +bookdiff | +intraday | +resid "
+          "| +broker basis | = live gross | -fees | +broker_resid | = live net |")
+        a("|---|---|---|---|---|---|---|---|---|---|---|")
         a(f"| {_f(cum['expected'])} | {_f(-cum['exec_cost'])} | "
           f"{_f(cum['marking'])} | "
           f"{_f(cum['bookdiff_carry'] + cum['bookdiff_creation'])} | "
+          f"{_f(cum['intraday_unfilled'])} | "
           f"{_f(cum['resid'])} | {_f(cum['broker_basis'])} | "
           f"{_f(cum['live_gross'])} | {_f(-cum['fees'])} | "
           f"{_f(cum['broker_resid'])} | {_f(cum['live_net'])} |")
@@ -208,17 +213,20 @@ def _plot(path, live: pd.DataFrame, bt_series: dict[str, pd.DataFrame],
     ax = axes[1]
     # .values everywhere: the live frame is string-date indexed, and pandas
     # would silently reindex (to all-NaN) against the datetime x otherwise.
+    intraday = (live["intraday_unfilled"] if "intraday_unfilled" in live.columns
+                else live["resid"] * 0.0)
     comp = {
         "-exec_cost": (-live["exec_cost"].cumsum()).values,
         "+marking": live["marking"].cumsum().values,
         "+bookdiff": (live["bookdiff_carry"] + live["bookdiff_creation"]).cumsum().values,
+        "+intraday": intraday.cumsum().values,
         "+resid": live["resid"].cumsum().values,
         "+broker_basis": live["broker_basis"].cumsum().values,
         "-fees": (-live["fees"].cumsum()).values,
     }
     for (col, vals), colr in zip(comp.items(),
-                                 ["#a33a2e", "#2f855a", "#805ad5", "#9a6b1e",
-                                  "#2b6cb0", "#4a5568"]):
+                                 ["#a33a2e", "#2f855a", "#805ad5", "#b83280",
+                                  "#9a6b1e", "#2b6cb0", "#4a5568"]):
         ax.plot(x, vals, lw=1.4, label=col, color=colr)
     ax.axhline(0, color="black", lw=0.7)
     ax.set_ylabel("CNY (cum)")

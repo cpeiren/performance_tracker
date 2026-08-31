@@ -106,6 +106,14 @@ RESID_REL = 0.5
 #: Ship payload considered stale after this many business days.
 SHIP_STALE_BDAYS = 3
 
+#: Minimum fraction of traded notional that must carry a shipped decision
+#: price for slip_total to be treated as measuring the book.  Below this the
+#: slippage number is mostly spread-only "unbenchmarked" cost and the report
+#: must say so (the failure mode is silent: benchmarks covered only the ks
+#: sleeve until 2026-09-01, and coverage would have collapsed to ~0 when the
+#: legacy per-source ships stop at Phase 5).
+SLIP_COVERAGE_MIN = 0.8
+
 #: Inbox ks summary.csv is expected refreshed by this UTC hour on weekdays.
 INBOX_SUMMARY_DUE_UTC_HOUR = 6.5
 

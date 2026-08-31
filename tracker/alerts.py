@@ -129,6 +129,15 @@ def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame
                           f"{int(last['unbenchmarked_legs'])} unbenchmarked "
                           f"leg(s), {float(last['exec_unbenchmarked']):+.0f} CNY "
                           f"exec cost without a shipped decision price.")
+        traded = float(last.get("traded_notional", 0) or 0)
+        benched = float(last.get("slip_notional", 0) or 0)
+        if traded > 0 and benched / traded < C.SLIP_COVERAGE_MIN:
+            alerts.append(
+                f"SLIPPAGE COVERAGE {ex.index[-1]}: only "
+                f"{100 * benched / traded:.0f}% of traded notional had a "
+                f"shipped decision price (< {100 * C.SLIP_COVERAGE_MIN:.0f}%) "
+                f"-- slip_total does not measure the whole book; check the "
+                f"forward meta union on the advisor.")
 
     # -- broker reconciliation --------------------------------------------
     summ = io_live.daily_summary()

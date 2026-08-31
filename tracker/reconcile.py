@@ -21,11 +21,17 @@ Per trading day D and contract c with multiplier m_c:
         (settle_sum_D = sum of per-symbol total_pnl in daily_pnl_<D>.csv --
          the settle-marked frame every other term lives in; the account
          'gross' is broker-equity based and differs by 1-3k CNY daily)
+    intraday_unfilled_D = per-snap deviation term (see tracker/intraday.py):
+                          the desired-vs-achieved book BETWEEN runs, priced
+                          decision-to-decision -- disjoint from the bookdiff
+                          terms by construction
     resid_D             = settle_sum_D - expected_D + exec_cost_D
                           - marking_D - bookdiff_carry_D - bookdiff_creation_D
+                          - intraday_unfilled_D
 
     live_gross_D = expected_D - exec_cost_D + marking_D + bookdiff_carry_D
-                   + bookdiff_creation_D + resid_D + broker_basis_D   (exact)
+                   + bookdiff_creation_D + intraday_unfilled_D + resid_D
+                   + broker_basis_D   (exact)
     live_net_D   = live_gross_D - fees_D + broker_resid_D
 
 Why these terms: exec_cost prices fills away from the shipped decision
@@ -50,6 +56,7 @@ from __future__ import annotations
 import pandas as pd
 
 import config as C
+from . import intraday as intr
 from . import io_live
 from .dates import normalize_date
 
@@ -161,6 +168,15 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
             b = s1  # no decision price -> term 0 by construction
         creation += dd * (s1 - b) * mult_of(t)
 
+    # -- per-snap deviation between decisions ------------------------------
+    # Prices the book held BETWEEN runs against each run's own target, so an
+    # intraday round trip / unfilled leg / BLOCKED run no longer lands in
+    # resid.  Subtracting db_prev inside keeps it disjoint from carry (which
+    # prices yesterday's standing deviation) and from creation (which prices
+    # the last run's deviation from its bench to settle).
+    intraday_unfilled, intraday_diag = intr.unfilled_between_snaps(
+        day, prev_pos, db_prev, {**prev_mult, **mult})
+
     # -- assemble ----------------------------------------------------------
     summ = io_live.daily_summary()
     if day not in summ.index:
@@ -181,7 +197,8 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
     broker_basis = live_gross - settle_sum
 
     expected = scale * bt_gross
-    resid = (settle_sum - expected + exec_cost - marking - carry - creation)
+    resid = (settle_sum - expected + exec_cost - marking - carry - creation
+             - intraday_unfilled)
 
     gross_book = sum(abs(net) * (io_live.lookup(settle, t) or 0.0) * m
                      for t, (net, m) in live_pos.items())
@@ -199,6 +216,9 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
         "basis_eod": basis_now,
         "bookdiff_carry": carry,
         "bookdiff_creation": creation,
+        "intraday_unfilled": intraday_unfilled,
+        "intraday_runs_used": intraday_diag.get("n_runs_used", 0),
+        "intraday_unpriced": intraday_diag.get("n_unpriced", 0),
         "resid": resid,
         "settle_sum": settle_sum,
         "broker_basis": broker_basis,
@@ -214,18 +234,28 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
 
 def weighted_bt(bt: pd.DataFrame, forward_flags: dict[str, bool],
                 weights_hist: dict[str, dict[str, float]]
-                ) -> tuple[pd.DataFrame, list[str]]:
+                ) -> tuple[pd.DataFrame, list[str], dict[str, list[str]]]:
     """Per-day WEIGHTED full-size backtest frame for the live window.
 
     date x strategy-key, value = w_i(day) * bt_i(day).  Legacy days weight
     ks_branch + fund_v3 at 1 and everything else 0 (the account traded those
     two books unweighted).  Forward days use the day's shipped merge weights,
     carrying the latest earlier day's forward when the day's own are not
-    shipped yet.  Returns (frame, weight problem messages).
+    shipped yet.
+
+    A strategy with nonzero weight but NO mature backtest row makes the
+    day's expected UNKNOWN, not smaller: the day is listed in the returned
+    ``incomplete`` map ({day: [missing strategy keys]}) and the bridge holds
+    it out until the rows ship (they self-heal on the next payload -- e.g.
+    stat_arb's ledger is structurally T-1).  Silently zero-filling those
+    rows is how a same-day expected once shrank to the ks sleeve alone.
+
+    Returns (frame, weight problem messages, incomplete).
     """
     from . import io_backtest  # local import: avoid module cycle
 
     problems: list[str] = []
+    incomplete: dict[str, list[str]] = {}
     days = [d for d in bt.index if d >= C.LIVE_START]
     out = pd.DataFrame(0.0, index=days, columns=list(C.STRATEGIES))
     out.index.name = "date"
@@ -244,23 +274,38 @@ def weighted_bt(bt: pd.DataFrame, forward_flags: dict[str, bool],
                     f"carried forward from an earlier day.")
         else:
             w = C.LEGACY_BRIDGE_WEIGHTS
+        missing: list[str] = []
         for key, wi in w.items():
-            if key in bt.columns and wi:
-                v = bt.at[d, key] if d in bt.index else float("nan")
-                out.at[d, key] = wi * float(v) if pd.notna(v) else 0.0
-    return out, problems
+            if not wi:
+                continue
+            v = bt.at[d, key] if key in bt.columns else float("nan")
+            if pd.notna(v):
+                out.at[d, key] = wi * float(v)
+            else:
+                missing.append(key)
+        if missing:
+            incomplete[d] = sorted(missing)
+    return out, problems, incomplete
 
 
 def bridge_all(bt_weighted: pd.DataFrame, scales: pd.Series,
-               forward_flags: dict[str, bool]) -> tuple[pd.DataFrame, list[str]]:
+               forward_flags: dict[str, bool],
+               incomplete: dict[str, list[str]] | None = None
+               ) -> tuple[pd.DataFrame, list[str], list[str]]:
     """Bridge every live day present in daily_summary from LIVE_START on.
 
     ``bt_weighted``: date x strategy-key WEIGHTED full-size gross (from
     weighted_bt); a day's combined backtest gross is its row sum.
     ``scales``: date -> scale (from main's scale pass).
     ``forward_flags``: date -> True when the merged forward book executed.
-    Returns (frame indexed by date, missing-live trading days).
+    ``incomplete``: days whose expected is unknown (weighted_bt found a
+    nonzero-weight strategy without a mature backtest row) -- those days are
+    HELD OUT of the bridge rather than reconciled against a partial
+    expected, and re-enter automatically once the rows ship (the whole
+    computation reruns from source every day).
+    Returns (frame indexed by date, missing-live days, pending days).
     """
+    incomplete = incomplete or {}
     summ = io_live.daily_summary()
     live_days = [d for d in summ.index if d >= C.LIVE_START]
 
@@ -276,8 +321,15 @@ def bridge_all(bt_weighted: pd.DataFrame, scales: pd.Series,
         missing = [d for d in missing if d < last_live]
 
     rows = []
+    pending: list[str] = []
     prev = None
     for day in live_days:
+        if day in incomplete:
+            # prev still advances: the day's live state exists and the next
+            # day's carry/marking legitimately reference it.
+            pending.append(day)
+            prev = day
+            continue
         bt_row = bt_weighted.reindex([day]).fillna(0.0)
         bt_gross = float(bt_row.sum(axis=1).iloc[0]) if len(bt_row) else 0.0
         scale = float(scales.get(day, float("nan")))
@@ -292,4 +344,4 @@ def bridge_all(bt_weighted: pd.DataFrame, scales: pd.Series,
     df = pd.DataFrame(rows)
     if len(df):
         df = df.set_index("date").sort_index()
-    return df, missing
+    return df, missing, pending

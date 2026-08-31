@@ -86,20 +86,29 @@ def main(argv=None) -> int:
               f"({len(fwd_dates)} day(s) with forward runs)")
 
     weights_hist = io_backtest.weights_history()
-    bt_weighted, weight_problems = reconcile.weighted_bt(bt, forward_flags,
-                                                         weights_hist)
+    bt_weighted, weight_problems, incomplete = reconcile.weighted_bt(
+        bt, forward_flags, weights_hist)
 
-    recon, missing = reconcile.bridge_all(bt_weighted, scales, forward_flags)
+    recon, missing, pending = reconcile.bridge_all(bt_weighted, scales,
+                                                   forward_flags, incomplete)
     if len(recon):
         recon.to_csv(C.RECON_CSV)
         print(f"reconciled {len(recon)} day(s): {recon.index[0]} -> {recon.index[-1]}")
     else:
         print("no reconcilable live days found")
+    pending_alerts = [
+        f"BT PENDING {d}: no mature backtest row for "
+        f"{', '.join(incomplete.get(d, []))} (nonzero weight) -- day held out "
+        f"of the bridge until the rows ship; it re-enters automatically."
+        for d in pending]
+    for msg in pending_alerts:
+        print(msg)
 
     missing_bucket = 0.0
     for d in missing:
         s = scales.get(d)
-        if s is not None and not pd.isna(s) and d in bt_weighted.index:
+        if (s is not None and not pd.isna(s) and d in bt_weighted.index
+                and d not in incomplete):  # partial expected must not enter the bucket
             missing_bucket += float(s) * float(bt_weighted.loc[d].fillna(0.0).sum())
 
     attribution = (AT.attribute_all(list(recon.index), forward_flags, weights_hist)
@@ -107,7 +116,7 @@ def main(argv=None) -> int:
     flags = (AT.live_flags(list(recon.index), forward_flags, weights_hist)
              if len(recon) else {k: False for k in C.STRATEGIES})
 
-    alert_list = problems + weight_problems + A.check_all(
+    alert_list = problems + weight_problems + pending_alerts + A.check_all(
         recon, missing, scales_df, state, bt_series, today, pin_div=pin_div,
         forward_flags=forward_flags, weights_hist=weights_hist)
 

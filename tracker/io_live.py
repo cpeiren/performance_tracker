@@ -120,6 +120,87 @@ def run_records(day: str) -> list[dict]:
     return out
 
 
+def fills_by_run(day: str) -> dict[str, dict[str, float]]:
+    """{run_id: {symbol: signed filled lots}} from the day's leg records.
+
+    ``trade_pos`` is the signed request and ``filled`` the filled count, so a
+    partial fill contributes sign(trade_pos) * filled, not the request.
+    """
+    p = C.DETAIL_DIR / f"{compact(day)}.jsonl"
+    if not p.exists():
+        return {}
+    out: dict[str, dict[str, float]] = {}
+    with open(p) as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if rec.get("type") != "leg":
+                continue
+            sym = rec.get("symbol")
+            signed = float(rec.get("trade_pos") or 0.0)
+            filled = float(rec.get("filled") or 0.0)
+            if not sym or not signed or not filled:
+                continue
+            run = out.setdefault(rec.get("run_id", ""), {})
+            run[sym] = run.get(sym, 0.0) + (1.0 if signed > 0 else -1.0) * filled
+    return out
+
+
+def _cst_naive_from_epoch(epoch: float):
+    """Box clock is UTC; run ids and advisor generated_at are CST wall time."""
+    import datetime as dt
+    return (dt.datetime.fromtimestamp(epoch, dt.timezone.utc)
+            .astimezone(dt.timezone(dt.timedelta(hours=8)))
+            .replace(tzinfo=None))
+
+
+def snap_price_sets(day: str) -> list[tuple]:
+    """Every decision-price set shipped for the day, time-sorted.
+
+    Returns [(naive-CST decision datetime, {preferred ticker: price})].
+    Forward meta (the union set) and the legacy ks meta both load -- they
+    coexist during the transition and later entries simply overwrite the
+    same contracts at the same snap.  Fundamental's daily marks enter at
+    their file mtime.
+    """
+    import datetime as dt
+    sets: list[tuple] = []
+    for source in (C.FORWARD_SOURCE, "ks"):
+        meta = C.INBOX / source / "meta"
+        for p in sorted(meta.glob(f"snap_prices_{normalize_date(day)}_*.json")):
+            try:
+                with open(p) as fh:
+                    raw = json.load(fh)
+                ts = dt.datetime.fromisoformat(raw["generated_at"])
+                if ts.tzinfo is not None:
+                    ts = ts.astimezone(
+                        dt.timezone(dt.timedelta(hours=8))).replace(tzinfo=None)
+            except (OSError, ValueError, KeyError):
+                continue
+            prices = {}
+            for human, px in (raw.get("prices") or {}).items():
+                if not px or px <= 0:
+                    continue
+                try:
+                    prices[names.preferred_ticker(human)] = float(px)
+                except ValueError:
+                    continue
+            if prices:
+                sets.append((ts, prices))
+    fp = C.INBOX / "fundamental" / "meta" / f"positions_{normalize_date(day)}.json"
+    if fp.exists():
+        fprices = fund_prices(day)
+        if fprices:
+            sets.append((_cst_naive_from_epoch(fp.stat().st_mtime), fprices))
+    sets.sort(key=lambda s: s[0])
+    return sets
+
+
 def scale_for_day(day: str, prev_scale: float | None) -> tuple[float | None, list[str]]:
     """Authoritative execution scale for the day, plus flags.
 
