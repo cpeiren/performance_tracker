@@ -1,0 +1,11 @@
+{
+  "_pin_note": "CORRECTED PIN 2026-08-31 (UTC evening): the ship fetched weights_forward.json AFTER the owner pre-staged the 2026-09-01 ksext restore (advisor mtime 09-01 04:06 CST), so the original pin carried ksext 0.5. The 08-31 merges from 09:40 CST on -- including the last executed book (13:49) -- ran with ksext 0.0 (TEMP cut, broker permission unconfirmed). Last-executed-book wins, matching the tracker's intraday scale convention.",
+  "_ksext": "TEMP 0.0 (2026-08-31 09:40 CST): broker permission for its CFFEX (if/ih/im) and new-listing products is UNCONFIRMED; restored to 0.5 on 2026-09-01.",
+  "agri": 1.0,
+  "chem": 1.5,
+  "fundamental": 2.0,
+  "ks": 0.8,
+  "ksext": 0.0,
+  "pairs": 1.5,
+  "statarb": 1.0
+}
