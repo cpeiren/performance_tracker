@@ -1,39 +1,39 @@
 {
   "backtest_fingerprints": {
     "agri_event": {
-      "last_date": "2026-08-28",
-      "n_rows": 154,
-      "sha256": "b11935beda565ace69602c2ebfb5d7d764b85743a84aa8cb56fa5e7892f25230"
+      "last_date": "2026-08-31",
+      "n_rows": 155,
+      "sha256": "1f717368da3bd6605266aeb8e8973d1a5d980ee64d9f9f312f98c1a5b356c932"
     },
     "chem_fund": {
-      "last_date": "2026-08-28",
-      "n_rows": 154,
-      "sha256": "0c889d28f987511402ae01bdf8eb8ce36dea2089577e2f2411ad1a7c750da902"
+      "last_date": "2026-08-31",
+      "n_rows": 155,
+      "sha256": "ecb3ae1c92f0093344e54b7583d8106206491d0659c86173ba5bb4b65952af59"
     },
     "china_pairs": {
-      "last_date": "2026-08-28",
-      "n_rows": 153,
-      "sha256": "9e089c9c6aeb09fe02145744f157f9b09d65dde1a8f52e9ef70ad3e43bc1abe0"
+      "last_date": "2026-08-31",
+      "n_rows": 154,
+      "sha256": "5b514cd8915fa06bfa1e3950563567ff8ea8cff0eb793089cb98d99dfbaff2e0"
     },
     "fund_v3": {
-      "last_date": "2026-08-28",
-      "n_rows": 154,
-      "sha256": "3450517feca534ea974707ea36f6372ac937f8c29a24435f49532c695d920224"
+      "last_date": "2026-08-31",
+      "n_rows": 155,
+      "sha256": "641eac471615eb01471a9e2eba2b9576ed904bcf8127ed4b8cb6517135d05ca6"
     },
     "ks_branch": {
-      "last_date": "2026-08-28",
-      "n_rows": 154,
-      "sha256": "73e5482dc548fc9bc0bffabeb86c0ca6d30372a88d74a11fa9d9a2472592e6bb"
+      "last_date": "2026-08-31",
+      "n_rows": 155,
+      "sha256": "60bcd1c4f007d42b3ab5550ca5b2dded8847f1be7647b3dda29d5870b5744d36"
     },
     "ks_ext": {
-      "last_date": "2026-08-28",
-      "n_rows": 153,
-      "sha256": "11aefdc7a0bd7a188f727b6e0a7c4a588cb305ab9953df6a103d3df365bfe245"
+      "last_date": "2026-08-31",
+      "n_rows": 154,
+      "sha256": "8aebd5533e17f58940b4c7a896df4dcffbddc39643fe33c47a1d19a0e83c7f63"
     },
     "stat_arb": {
-      "last_date": "2026-08-28",
-      "n_rows": 154,
-      "sha256": "be5e4cd1421ec24df30d49284120340196e3f7a3be7f5594914b6b7dc4875faa"
+      "last_date": "2026-08-31",
+      "n_rows": 155,
+      "sha256": "b02ca54487034bbde1959c8f0237f1431b0927024a7b7f824cd0d337decca804"
     }
   },
   "bt_pin_divergence_announced": {
@@ -45,7 +45,8 @@
       "2026-08-24",
       "2026-08-25",
       "2026-08-26",
-      "2026-08-27"
+      "2026-08-27",
+      "2026-08-28"
     ],
     "ks_branch": [
       "2026-08-18",
@@ -57,6 +58,10 @@
       "2026-08-26",
       "2026-08-27",
       "2026-08-28"
+    ],
+    "ks_ext": [
+      "2026-08-19",
+      "2026-08-26"
     ]
   },
   "bt_pinned": {
@@ -133,13 +138,21 @@
       "stat_arb": -5899.8383
     },
     "2026-08-28": {
+      "agri_event": -17340.0,
+      "chem_fund": 13435.0,
+      "china_pairs": 5790.0,
       "fund_v3": 4177.9254,
-      "ks_branch": 10010.0
+      "ks_branch": 10010.0,
+      "ks_ext": -11280.0,
+      "stat_arb": -12627.5
+    },
+    "2026-08-31": {
+      "ks_branch": 9530.0
     }
   },
   "last_run": {
-    "at": "2026-08-31T20:28:13+00:00",
-    "n_alerts": 5,
+    "at": "2026-09-01T14:30:09+00:00",
+    "n_alerts": 17,
     "reconciled_through": "2026-08-31"
   },
   "missing_live_days": [
@@ -202,6 +215,11 @@
         "null_scale_run"
       ],
       "scale": 0.2
+    },
+    {
+      "date": "2026-09-01",
+      "flags": [],
+      "scale": 0.5
     }
   ]
 }
