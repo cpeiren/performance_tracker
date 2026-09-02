@@ -116,6 +116,10 @@ def main(argv=None) -> int:
     flags = (AT.live_flags(list(recon.index), forward_flags, weights_hist)
              if len(recon) else {k: False for k in C.STRATEGIES})
 
+    # which divergent pin dates are new THIS run (check_all marks them announced)
+    _ann = state.get("bt_pin_divergence_announced", {})
+    pin_new = {s: len([d for d in e["dates"] if d not in _ann.get(s, [])])
+               for s, e in pin_div.items()}
     alert_list = problems + weight_problems + pending_alerts + A.check_all(
         recon, missing, scales_df, state, bt_series, today, pin_div=pin_div,
         forward_flags=forward_flags, weights_hist=weights_hist)
@@ -123,6 +127,8 @@ def main(argv=None) -> int:
     pin_info = {
         "n_days": len(state.get("bt_pinned", {})),
         "divergent": {s: len(e["dates"]) for s, e in pin_div.items()},
+        "max_abs": {s: e["max_abs"] for s, e in pin_div.items()},
+        "new": pin_new,
     }
     report.write_report(today, recon, state.get("missing_live_days", []),
                         missing_bucket, scales_df, attribution, bt_series,

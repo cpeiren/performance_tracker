@@ -11,7 +11,6 @@ component books; both are stored first-write-wins (as-shipped pins on disk).
 
 from __future__ import annotations
 
-import hashlib
 import json
 
 import pandas as pd
@@ -166,21 +165,49 @@ def overlay_and_update_pins(bt: pd.DataFrame, state: dict) -> tuple[pd.DataFrame
     return bt.sort_index(), new
 
 
-def series_fingerprint(df: pd.DataFrame, exclude_last_n: int = 5) -> dict:
-    """Revision detector: hash of all rows except the trailing few.
+#: A backtest row is a revision only if it moved by more than this (CNY);
+#: the same tolerance pin_divergence uses.
+REVISION_TOL = 1.0
 
-    The trailing rows are provisional (day-D backtest rows regenerate on
-    D+1); everything before them must be bit-stable run over run.
+
+def mature_rows(df: pd.DataFrame) -> dict[str, float]:
+    """{date: gross_pnl} for every row that is final: everything before the
+    series' last date.  The last row is provisional (day-D rows regenerate on
+    D+1), so it is excluded -- the same maturity rule the pins use.
+
+    This is the revision baseline kept in state.  It replaces the old whole-
+    series sha256, which could never match run over run because the stable
+    region gains one row every day (BACKTEST REVISED fired for all seven books
+    daily, whether or not any value had changed).
     """
     if not len(df):
-        return {"sha256": None, "n_rows": 0, "last_date": None}
-    stable = df.iloc[:-exclude_last_n] if len(df) > exclude_last_n else df.iloc[:0]
-    payload = stable[["gross_pnl"]].round(2).to_csv().encode()
-    return {
-        "sha256": hashlib.sha256(payload).hexdigest(),
-        "n_rows": int(len(stable)),
-        "last_date": str(df.index.max()),
-    }
+        return {}
+    mx = df.index.max()
+    ser = df["gross_pnl"].dropna()
+    return {str(d): round(float(v), 2) for d, v in ser.items() if d < mx}
+
+
+def series_revisions(baseline: dict[str, float], df: pd.DataFrame,
+                     skip_dates=()) -> list[tuple[str, float, float]]:
+    """Rows present in both the stored baseline and the current series whose
+    value moved by more than REVISION_TOL: [(date, old, new)], date-sorted.
+
+    Growth (new mature rows) is not a revision.  `skip_dates` are dates
+    covered by another detector (the as-shipped pins) so a revised live-window
+    day is reported once, not twice.
+    """
+    if not baseline or not len(df):
+        return []
+    cur = mature_rows(df)
+    skip = set(skip_dates)
+    out = []
+    for d, old in baseline.items():
+        if d in skip or d not in cur:
+            continue
+        new = cur[d]
+        if abs(new - float(old)) > REVISION_TOL:
+            out.append((d, float(old), new))
+    return sorted(out)
 
 
 _LEGACY_PIN_KEYS = {"ks": "ks_branch", "fundamental": "fund_v3"}
@@ -191,7 +218,7 @@ def load_state() -> dict:
         with open(C.STATE_JSON) as fh:
             state = json.load(fh)
     else:
-        return {"backtest_fingerprints": {}, "scale_history": [],
+        return {"backtest_mature_rows": {}, "scale_history": [],
                 "missing_live_days": [], "last_run": {}}
     # migrate pre-forward pin keys (bridge columns were ks/fundamental) to
     # strategy keys; idempotent, values untouched

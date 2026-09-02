@@ -54,6 +54,19 @@ Alerts (top of every report): missing days, stale inbox, scale changes,
 merge weight changes, missing forward/component books, backtest history
 revisions, unbenchmarked slippage, broker diffs, residual blowouts, ship
 staleness, ks cross-check.
+- BACKTEST REVISED compares every mature row (date < series max) against the
+  values stored at the previous run (state.json backtest_mature_rows), so it
+  fires only when a value actually moved; dates carried by the pins are left
+  to the BT REVISED vs PINS alert.  (Until 2026-09-02 it hashed the whole
+  stable region, which grows daily, so it fired for all seven books every day.)
+- RESIDUAL excuses window straddles: a backtest day is 09:00(D)->09:00(D+1),
+  a live day is settle(D-1)->settle(D); the unshared 15:00(D)->09:00(D+1) leg
+  prints mirror-image residuals on D and D+1.  A break-out is alerted only
+  when neither neighbouring day offsets it; the latest day is judged once the
+  next one reconciles.
+
+Tests: `python -m pytest tests/` (pure functions only; nothing touches the
+box).
 
 Optional cron on the box (owner installs; report generation only -- publish
 still happens from the local session):

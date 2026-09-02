@@ -110,15 +110,7 @@ def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame
         alerts.append(f"SCALE CHANGE on {row['date']}: now {row['scale']:g}.")
 
     # -- backtest history revisions --------------------------------------
-    fp_state = state.setdefault("backtest_fingerprints", {})
-    for key, df in bt_series.items():
-        fp = io_backtest.series_fingerprint(df)
-        old = fp_state.get(key)
-        if old and old.get("sha256") and fp["sha256"] and old["sha256"] != fp["sha256"]:
-            alerts.append(f"BACKTEST REVISED: {key} history (rows before the "
-                          f"trailing 5 days) changed since last run -- "
-                          f"regeneration upstream. Fingerprint re-baselined.")
-        fp_state[key] = fp
+    alerts += revision_alerts(bt_series, state)
 
     # -- exec quality -----------------------------------------------------
     ex = io_live.exec_summary()
@@ -149,20 +141,7 @@ def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame
                           f"= {float(dvb):+.2f} CNY (should be 0).")
 
     # -- residual blowouts -------------------------------------------------
-    # The day-window mismatch (see reconcile.py) makes daily residuals noisy
-    # by construction, so a residual only alerts when it breaks out of its
-    # own trailing distribution -- a CHANGE in attribution quality.
-    if len(recon) >= 3:
-        med = recon["resid"].abs().rolling(10, min_periods=3).median().shift(1)
-        for d, row in recon.iterrows():
-            base = med.get(d)
-            if base is None or pd.isna(base):
-                continue
-            thresh = max(C.RESID_ABS_FLOOR, 3.0 * float(base))
-            if abs(row["resid"]) > thresh:
-                alerts.append(f"RESIDUAL {d}: {row['resid']:+.0f} CNY vs trailing "
-                              f"median |resid| {base:.0f} -- attribution quality "
-                              f"changed that day.")
+    alerts += residual_alerts(recon)
 
     # -- ship staleness ----------------------------------------------------
     newest = None
@@ -192,4 +171,70 @@ def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame
                 alerts.append(f"KS CROSS-CHECK: shipped ks_branch series differs "
                               f"from inbox summary on {len(bad)} date(s), max "
                               f"|diff| {bad.max():.0f} CNY (first: {bad.index[0]}).")
+    return alerts
+
+
+def revision_alerts(bt_series: dict[str, pd.DataFrame], state: dict) -> list[str]:
+    """One alert per series whose already-mature rows moved since the last
+    run, with the dates and the net effect; the baseline is then replaced so
+    a revision is reported exactly once.  Dates carried by the as-shipped pins
+    are left to the pin alert.  First run after deploy only creates the
+    baseline.  Pure: touches only `state` and the frames passed in."""
+    alerts: list[str] = []
+    state.pop("backtest_fingerprints", None)   # pre-2026-09-03 sha baseline
+    base_state = state.setdefault("backtest_mature_rows", {})
+    pinned = state.get("bt_pinned", {})
+    for key, df in bt_series.items():
+        old = base_state.get(key)
+        if old:
+            skip = [d for d, vals in pinned.items() if key in vals]
+            rev = io_backtest.series_revisions(old, df, skip_dates=skip)
+            if rev:
+                net = sum(new - o for _, o, new in rev)
+                worst = max(rev, key=lambda r: abs(r[2] - r[1]))
+                alerts.append(
+                    f"BACKTEST REVISED: {key} -- {len(rev)} mature row(s) "
+                    f"changed since last run (net {net:+.0f} CNY, largest "
+                    f"{worst[0]} {worst[1]:+.0f} -> {worst[2]:+.0f}; first "
+                    f"{rev[0][0]}, last {rev[-1][0]}). Regeneration upstream; "
+                    f"baseline re-set.")
+        base_state[key] = io_backtest.mature_rows(df)
+    return alerts
+
+
+def residual_alerts(recon: pd.DataFrame) -> list[str]:
+    """Residual break-out, excusing window straddles.
+
+    A backtest day is the 09:00(D) -> 09:00(D+1) window, a live day is
+    settle(D-1) -> settle(D) (reconcile.py, KNOWN LIMITATION).  The leg they
+    do not share -- 15:00(D) -> 09:00(D+1) -- enters expected on D and live
+    on D+1, so a large move there prints a residual of one sign on D and its
+    mirror image on D+1 (2026-09-01: -42.8k, all of it that leg).  A day that
+    breaks out of its trailing distribution is therefore alerted only when
+    NEITHER neighbour offsets it; a day whose predecessor or successor cancels
+    it is the straddle, not attribution.  The latest day has no successor yet
+    and is judged on the next run."""
+    alerts: list[str] = []
+    if len(recon) < 4 or "resid" not in recon.columns:
+        return alerts
+    r = recon["resid"].astype(float)
+    med = r.abs().rolling(10, min_periods=3).median().shift(1)
+    dates = list(recon.index)
+    for i in range(1, len(dates) - 1):
+        base = med.iloc[i]
+        v = float(r.iloc[i])
+        if pd.isna(base):
+            continue
+        thresh = max(C.RESID_ABS_FLOOR, 3.0 * float(base))
+        if abs(v) <= thresh:
+            continue
+        prev_v, next_v = float(r.iloc[i - 1]), float(r.iloc[i + 1])
+        if min(abs(v + prev_v), abs(v + next_v)) <= thresh:
+            continue  # mirrored by a neighbour: the day-window straddle
+        alerts.append(f"RESIDUAL {dates[i]}: {v:+.0f} CNY vs trailing median "
+                      f"|resid| {float(base):.0f}, offset by neither neighbour "
+                      f"({dates[i - 1]} {prev_v:+.0f}, {dates[i + 1]} {next_v:+.0f}) "
+                      f"-- attribution quality changed. (A break-out that a "
+                      f"neighbouring day mirrors is the backtest/live day-window "
+                      f"straddle and is not alerted.)")
     return alerts

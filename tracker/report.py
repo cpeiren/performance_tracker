@@ -70,7 +70,8 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
           f"bookdiff {_f(last['bookdiff_carry'] + last['bookdiff_creation'])} "
           f"(carry {_f(last['bookdiff_carry'])}, new {_f(last['bookdiff_creation'])}) | "
           f"intraday {_f(last.get('intraday_unfilled', 0.0))} | "
-          f"residual {_f(last['resid'])} | broker basis {_f(last['broker_basis'])}")
+          f"residual {_f(last['resid'])} (window-straddled: judge with the next "
+          f"day's) | broker basis {_f(last['broker_basis'])}")
         a(f"  fees {_f(last['fees'])} | broker residual {_f(last['broker_resid'])} "
           f"-> live net {_f(last['live_net'])}")
         a("")
@@ -168,9 +169,16 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
         a("merge weights (" + wd + "): "
           + ", ".join(f"{k} {w.get(k, 0):g}" for k in C.STRATEGIES))
     if pin_info:
-        div = ", ".join(f"{s}: {n}" for s, n in pin_info.get("divergent", {}).items())
+        mx = pin_info.get("max_abs", {})
+        new = pin_info.get("new", {})
+        div = ", ".join(
+            f"{s}: {n} day(s), max {mx.get(s, 0):,.0f} CNY"
+            + (f", {new[s]} NEW" if new.get(s) else "")
+            for s, n in pin_info.get("divergent", {}).items())
         a(f"as-shipped pins: {pin_info.get('n_days', 0)} live day(s) pinned"
-          + (f"; current series diverges on {div}" if div else ""))
+          + (f"; current series diverges from pins on {div}" if div else "")
+          + ("; standing counts -- a divergence is announced as an alert once, "
+             "the first run it appears, and kept here afterwards" if div else ""))
     from . import io_live as _il
     mt = _il.inbox_ks_summary_mtime()
     if mt:
