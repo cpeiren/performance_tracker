@@ -8,19 +8,11 @@
 - SCALE 2026-08-28: no usable run record; previous scale carried forward.
 - SCALE CHANGE on 2026-08-27: now 0.2.
 - SCALE CHANGE on 2026-09-01: now 0.5.
-- BACKTEST REVISED: ks_branch history (rows before the trailing 5 days) changed since last run -- regeneration upstream. Fingerprint re-baselined.
-- BACKTEST REVISED: fund_v3 history (rows before the trailing 5 days) changed since last run -- regeneration upstream. Fingerprint re-baselined.
-- BACKTEST REVISED: china_pairs history (rows before the trailing 5 days) changed since last run -- regeneration upstream. Fingerprint re-baselined.
-- BACKTEST REVISED: ks_ext history (rows before the trailing 5 days) changed since last run -- regeneration upstream. Fingerprint re-baselined.
-- BACKTEST REVISED: chem_fund history (rows before the trailing 5 days) changed since last run -- regeneration upstream. Fingerprint re-baselined.
-- BACKTEST REVISED: agri_event history (rows before the trailing 5 days) changed since last run -- regeneration upstream. Fingerprint re-baselined.
-- BACKTEST REVISED: stat_arb history (rows before the trailing 5 days) changed since last run -- regeneration upstream. Fingerprint re-baselined.
 - SLIPPAGE 2026-09-02: 10 unbenchmarked leg(s), +5 CNY exec cost without a shipped decision price.
-- RESIDUAL 2026-09-01: -42842 CNY vs trailing median |resid| 5210 -- attribution quality changed that day.
 
 ## Latest reconciled day (2026-09-01, forward regime)
 live gross +16,045 | expected (0.5 x bt +238,285) = +119,142 | gap -103,097
-  exec_cost +12,118 (slip +2,725, unbench +9,392) | marking -38,415 | bookdiff +4,359 (carry +7,017, new -2,658) | intraday +0 | residual -42,842 | broker basis -14,082
+  exec_cost +12,118 (slip +2,725, unbench +9,392) | marking -38,415 | bookdiff +4,359 (carry +7,017, new -2,658) | intraday +0 | residual -42,842 (window-straddled: judge with the next day's) | broker basis -14,082
   fees +1,963 | broker residual -22,848 -> live net -8,766
 
 ## Cumulative bridge (live since 2026-08-18, 10 reconciled days)
@@ -57,5 +49,5 @@ forward-day attribution is pro-rated by weighted full-size lots; legacy days rem
 scale: 0.5 (since 2026-09-01)
 regime: forward (merged weighted book) since 2026-08-31; 2 forward day(s), 8 legacy day(s)
 merge weights (2026-09-02): ks_branch 0.8, fund_v3 2, china_pairs 1.5, ks_ext 0.25, chem_fund 1.5, agri_event 1, stat_arb 0
-as-shipped pins: 11 live day(s) pinned; current series diverges on fund_v3: 9, ks_branch: 9, ks_ext: 2
+as-shipped pins: 11 live day(s) pinned; current series diverges from pins on fund_v3: 9 day(s), max 737 CNY, ks_branch: 9 day(s), max 35,915 CNY, ks_ext: 2 day(s), max 950 CNY; standing counts -- a divergence is announced as an alert once, the first run it appears, and kept here afterwards
 inbox ks summary mtime: 2026-09-02 05:52 UTC
