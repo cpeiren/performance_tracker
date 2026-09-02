@@ -1,0 +1,9 @@
+{
+  "agri": 1.0,
+  "chem": 1.5,
+  "fundamental": 2.0,
+  "ks": 0.8,
+  "ksext": 0.25,
+  "pairs": 1.5,
+  "statarb": 0.0
+}
