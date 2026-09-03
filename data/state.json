@@ -1291,8 +1291,8 @@
     }
   },
   "last_run": {
-    "at": "2026-09-03T14:25:34+00:00",
-    "n_alerts": 17,
+    "at": "2026-09-03T16:13:18+00:00",
+    "n_alerts": 10,
     "reconciled_through": "2026-09-02"
   },
   "missing_live_days": [

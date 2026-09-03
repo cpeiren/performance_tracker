@@ -5,29 +5,22 @@
 - WEIGHTS CHANGE on 2026-09-01: ks_ext: 0.0->0.25.
 - WEIGHTS CHANGE on 2026-09-02: stat_arb: 1.0->0.0.
 - WEIGHTS CHANGE on 2026-09-03: stat_arb: 0.0->1.0.
-- BT REVISED vs PINS: fund_v3 current history differs from pinned as-shipped values on 1 new live-window day(s) (max |diff| 22925 CNY, first 2026-08-31); the bridge keeps the pins.
-- BT REVISED vs PINS: stat_arb current history differs from pinned as-shipped values on 10 new live-window day(s) (max |diff| 7372 CNY, first 2026-08-18); the bridge keeps the pins.
-- BT REVISED vs PINS: agri_event current history differs from pinned as-shipped values on 3 new live-window day(s) (max |diff| 5680 CNY, first 2026-08-27); the bridge keeps the pins.
 - MISSING LIVE DAY 2026-08-28: trading day with a backtest row but no daily_pnl/state file; excluded from the bridge, expected pnl held in the missing-day bucket.
 - SCALE 2026-08-28: no usable run record; previous scale carried forward.
 - SCALE CHANGE on 2026-08-27: now 0.2.
 - SCALE CHANGE on 2026-09-01: now 0.5.
-- BACKTEST REVISED: fund_v3 -- 143 mature row(s) changed since last run (net -857 CNY, largest 2026-01-22 +55470 -> +54869; first 2026-01-06, last 2026-08-17). Regeneration upstream; baseline re-set.
-- BACKTEST REVISED: chem_fund -- 8 mature row(s) changed since last run (net -650 CNY, largest 2026-06-04 +7080 -> +4130; first 2026-05-29, last 2026-06-09). Regeneration upstream; baseline re-set.
-- BACKTEST REVISED: agri_event -- 10 mature row(s) changed since last run (net +5450 CNY, largest 2026-02-24 +47280 -> +50705; first 2026-02-09, last 2026-08-10). Regeneration upstream; baseline re-set.
-- BACKTEST REVISED: stat_arb -- 150 mature row(s) changed since last run (net +50861 CNY, largest 2026-06-29 +17123 -> -13441; first 2026-01-05, last 2026-08-17). Regeneration upstream; baseline re-set.
-- SLIPPAGE 2026-09-03: 9 unbenchmarked leg(s), +65 CNY exec cost without a shipped decision price.
-- RESIDUAL 2026-09-01: -40058 CNY vs trailing median |resid| 5210, offset by neither neighbour (2026-08-31 +6173, 2026-09-02 +78056) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
+- SLIPPAGE 2026-09-03: 4 unbenchmarked leg(s), +30 CNY exec cost without a shipped decision price.
+- RESIDUAL 2026-09-01: -40058 CNY vs trailing median |resid| 5210, offset by neither neighbour (2026-08-31 +6748, 2026-09-02 +90351) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
 
 ## Latest reconciled day (2026-09-02, forward regime)
 live gross +40,175 | expected (0.5 x bt -93,760) = -46,880 | gap +87,055
-  exec_cost -12,545 (slip -12,550, unbench +5) | marking +23,820 | bookdiff +4,132 (carry +6,410, new -2,278) | intraday +7,852 | residual +78,056 (window-straddled: judge with the next day's) | broker basis -39,351
+  exec_cost -250 (slip -270, unbench +20) | marking +23,820 | bookdiff +4,132 (carry +6,410, new -2,278) | intraday +7,852 | residual +90,351 (window-straddled: judge with the next day's) | broker basis -39,351
   fees +824 | broker residual +6,034 -> live net +45,385
 
 ## Cumulative bridge (live since 2026-08-18, 11 reconciled days)
 | expected | -exec | +marking | +bookdiff | +intraday | +resid | +broker basis | = live gross | -fees | +broker_resid | = live net |
 |---|---|---|---|---|---|---|---|---|---|---|
-| +108,975 | +1,262 | -5,760 | +5,998 | +5,372 | +42,670 | -76,603 | +81,915 | -5,312 | -15,130 | +61,473 |
+| +108,975 | -11,608 | -5,760 | +5,998 | +5,372 | +55,540 | -76,603 | +81,915 | -5,312 | -15,130 | +61,473 |
 missing live days excluded: 2026-08-28 (expected +2,838 held in bucket)
 
 ## Stats (daily CNY pnl)
@@ -58,5 +51,5 @@ forward-day attribution is pro-rated by weighted full-size lots; legacy days rem
 scale: 0.5 (since 2026-09-01)
 regime: forward (merged weighted book) since 2026-08-31; 3 forward day(s), 8 legacy day(s)
 merge weights (2026-09-03): ks_branch 0.8, fund_v3 2, china_pairs 1.5, ks_ext 0.25, chem_fund 1.5, agri_event 1, stat_arb 1
-as-shipped pins: 12 live day(s) pinned; current series diverges from pins on fund_v3: 10 day(s), max 22,925 CNY, 1 NEW, ks_branch: 9 day(s), max 35,915 CNY, stat_arb: 10 day(s), max 7,372 CNY, 10 NEW, ks_ext: 2 day(s), max 950 CNY, agri_event: 3 day(s), max 5,680 CNY, 3 NEW; standing counts -- a divergence is announced as an alert once, the first run it appears, and kept here afterwards
+as-shipped pins: 12 live day(s) pinned; current series diverges from pins on fund_v3: 10 day(s), max 22,925 CNY, ks_branch: 9 day(s), max 35,915 CNY, stat_arb: 10 day(s), max 7,372 CNY, ks_ext: 2 day(s), max 950 CNY, agri_event: 3 day(s), max 5,680 CNY; standing counts -- a divergence is announced as an alert once, the first run it appears, and kept here afterwards
 inbox ks summary mtime: 2026-09-03 05:52 UTC
