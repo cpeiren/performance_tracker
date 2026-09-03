@@ -17,22 +17,22 @@ Per trading day D and contract c with multiplier m_c:
         basis(D) = sum_c live_net_c(D) * (settle_c(D) - bench_c(D)) * m_c
     bookdiff_carry_D    = sum_c dbook_c(D-1) * (settle_c(D) - settle_c(D-1)) * m_c
     bookdiff_creation_D = sum_c (dbook_c(D) - dbook_c(D-1)) * (settle_c(D) - bench_c(D)) * m_c
-    broker_basis_D      = live_gross_D - settle_sum_D
-        (settle_sum_D = sum of per-symbol total_pnl in daily_pnl_<D>.csv --
-         the settle-marked frame every other term lives in; the account
-         'gross' is broker-equity based and differs by 1-3k CNY daily)
     intraday_unfilled_D = per-snap deviation term (see tracker/intraday.py):
                           the desired-vs-achieved book BETWEEN runs, priced
                           decision-to-decision -- disjoint from the bookdiff
                           terms by construction
-    resid_D             = settle_sum_D - expected_D + exec_cost_D
+    resid_D             = live_gross_D - expected_D + exec_cost_D
                           - marking_D - bookdiff_carry_D - bookdiff_creation_D
                           - intraday_unfilled_D
 
     live_gross_D = expected_D - exec_cost_D + marking_D + bookdiff_carry_D
-                   + bookdiff_creation_D + intraday_unfilled_D + resid_D
-                   + broker_basis_D   (exact)
+                   + bookdiff_creation_D + intraday_unfilled_D + resid_D   (exact)
     live_net_D   = live_gross_D - fees_D + broker_resid_D
+
+live_gross_D is pyexec's settle-marked sum (holding + trading per contract,
+== the broker's CloseProfit + PositionProfit); live_net_D is the account
+equity delta against the counter's PreBalance, so broker_resid_D is ~0
+since pyexec F124 (2026-09-03).
 
 Why these terms: exec_cost prices fills away from the shipped decision
 (positive = paid); the telescoping marking term absorbs the settle-vs-snap
@@ -192,12 +192,8 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
     unbench = float(ex.loc[day, "exec_unbenchmarked"]) if day in ex.index else 0.0
     exec_cost = slip_total + unbench
 
-    pnl_tbl = io_live.daily_pnl(day)
-    settle_sum = float(pnl_tbl["total_pnl"].sum()) if pnl_tbl is not None else live_gross
-    broker_basis = live_gross - settle_sum
-
     expected = scale * bt_gross
-    resid = (settle_sum - expected + exec_cost - marking - carry - creation
+    resid = (live_gross - expected + exec_cost - marking - carry - creation
              - intraday_unfilled)
 
     gross_book = sum(abs(net) * (io_live.lookup(settle, t) or 0.0) * m
@@ -220,8 +216,6 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
         "intraday_runs_used": intraday_diag.get("n_runs_used", 0),
         "intraday_unpriced": intraday_diag.get("n_unpriced", 0),
         "resid": resid,
-        "settle_sum": settle_sum,
-        "broker_basis": broker_basis,
         "live_gross": live_gross,
         "fees": fees,
         "broker_resid": broker_resid,

@@ -125,15 +125,27 @@ def attribute_all(days: list[str], forward_flags: dict[str, bool],
 def live_flags(days: list[str], forward_flags: dict[str, bool],
                weights_hist: dict[str, dict[str, float]]) -> dict[str, bool]:
     """strategy -> is it live: its legacy source fed a recent executed run,
-    or the forward book executes and the strategy's merge weight is > 0."""
+    or the forward book executes and the strategy's merge weight is > 0.
+
+    ``days`` should include the report day: the weights that decide "live"
+    are those of the LAST DAY A FORWARD RUN EXECUTED, which is usually today
+    and not yet reconciled (its backtest row is still pending).  Until
+    2026-09-03 this read the last reconciled day, so a strategy parked for one
+    day and re-enabled the next showed as not live for a day.
+    """
     recent = days[-10:]
     seen: set[str] = set()
+    last_fwd = None
     for d in recent:
-        seen |= io_live.executed_sources(d)
+        src = io_live.executed_sources(d)
+        seen |= src
+        if C.FORWARD_SOURCE in src:
+            last_fwd = d
     flags = {k: (v[1] in seen) if v[1] else False for k, v in C.STRATEGIES.items()}
-    fwd_days = [d for d in recent if forward_flags.get(d)]
-    if fwd_days:
-        w = io_backtest.weights_for_day(max(fwd_days), weights_hist)[0] or {}
+    if last_fwd is None:
+        last_fwd = max((d for d in recent if forward_flags.get(d)), default=None)
+    if last_fwd:
+        w = io_backtest.weights_for_day(last_fwd, weights_hist)[0] or {}
         for key in C.STRATEGIES:
             if w.get(key):
                 flags[key] = True

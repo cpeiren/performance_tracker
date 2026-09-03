@@ -16,7 +16,6 @@ import config as C
 from . import names
 from .dates import compact, normalize_date
 
-SENTINELS = {"_AGGREGATE", "_RESIDUAL"}
 
 
 def lookup(d: dict, ticker: str, default=None):
@@ -44,12 +43,19 @@ def daily_summary() -> pd.DataFrame:
 
 
 def daily_pnl(day: str) -> pd.DataFrame | None:
-    """Per-symbol daily P&L for one day, sentinel rows removed. None if missing."""
+    """Per-symbol daily P&L for one day, sentinel rows removed. None if missing.
+
+    pyexec appends account-level rows whose symbol starts with "_" (_GROSS,
+    _FEES, _AGGREGATE, _RESIDUAL, _RESTATEMENT ...).  Strip by prefix: until
+    2026-09-03 only two names were listed, so the per-symbol sum came out as
+    2*gross - fees and leaked into the residual, a phantom "broker basis"
+    term and the no-target attribution bucket.
+    """
     p = C.PNL_DIR / f"daily_pnl_{compact(day)}.csv"
     if not p.exists():
         return None
     df = pd.read_csv(p)
-    return df[~df["symbol"].isin(SENTINELS)].reset_index(drop=True)
+    return df[~df["symbol"].astype(str).str.startswith("_")].reset_index(drop=True)
 
 
 def state(day: str) -> dict | None:
@@ -95,6 +101,16 @@ def exec_summary() -> pd.DataFrame:
     df = pd.read_csv(p)
     df["date"] = df["date"].map(normalize_date)
     return df.drop_duplicates("date", keep="last").set_index("date").sort_index()
+
+
+def exec_products() -> pd.DataFrame:
+    """analysis/exec_products.csv: one row per date x product, ISO dates."""
+    p = C.ANALYSIS_DIR / "exec_products.csv"
+    if not p.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(p)
+    df["date"] = df["date"].map(normalize_date)
+    return df.drop_duplicates(["date", "product"], keep="last").sort_values("date")
 
 
 # --------------------------------------------------------------------------

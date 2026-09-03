@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 import config as C
+from . import io_live
 from . import stats as S
 
 
@@ -27,6 +28,73 @@ def _stat_row(name: str, p: dict) -> str:
     hit = f"{p['hit'] * 100:.0f}%" if p.get("hit") is not None else "-"
     return (f"| {name} | {p['n_days']} | {_f(p.get('total'))} | {sh} | "
             f"{mdd} | {hit} |{tag}")
+
+
+def _bps(cny: float, notional: float) -> str:
+    return f"{1e4 * cny / notional:+.2f}" if notional else "-"
+
+
+def _slippage_section(a, day: str, n_days: int = 10) -> None:
+    """Execution cost from pyexec's analysis files (the exec_cost source):
+    daily bps with the drift/exec split, the live-window total, and the
+    per-product ranking.  drift = decision price -> send time (pipeline
+    latency), exec = send time -> fill (what the chase controls).
+    + = cost paid.  bps are against benchmarked notional."""
+    ex = io_live.exec_summary()
+    ex = ex.loc[(ex.index >= C.LIVE_START) & (ex.index <= day)] if len(ex) else ex
+    a("## Slippage (+ = cost; bps vs benchmarked notional)")
+    if not len(ex):
+        a("no exec_summary rows in the live window")
+        a("")
+        return
+    a("| day | lots | notional M | slip total | drift | exec | bps | unbench legs | unbench CNY |")
+    a("|---|---|---|---|---|---|---|---|---|")
+    for d, r in ex.tail(n_days).iterrows():
+        a(f"| {d} | {r['traded_lots']:.0f} | {r['traded_notional'] / 1e6:.1f} | "
+          f"{_f(r['slip_total'])} | {_f(r['slip_drift'])} | {_f(r['slip_exec'])} | "
+          f"{_bps(r['slip_total'], r['slip_notional'])} | "
+          f"{r['unbenchmarked_legs']:.0f} | {_f(r['exec_unbenchmarked'])} |")
+    t = ex.sum(numeric_only=True)
+    a(f"| live window ({len(ex)}d) | {t['traded_lots']:.0f} | "
+      f"{t['traded_notional'] / 1e6:.1f} | {_f(t['slip_total'])} | "
+      f"{_f(t['slip_drift'])} | {_f(t['slip_exec'])} | "
+      f"{_bps(t['slip_total'], t['slip_notional'])} | "
+      f"{t['unbenchmarked_legs']:.0f} | {_f(t['exec_unbenchmarked'])} |")
+    a(f"exec-only bps over the window: {_bps(t['slip_exec'], t['slip_notional'])}; "
+      f"benchmark coverage {100 * t['slip_notional'] / t['traded_notional']:.0f}% "
+      f"of traded notional")
+
+    pr = io_live.exec_products()
+    pr = pr[(pr["date"] >= C.LIVE_START) & (pr["date"] <= day)] if len(pr) else pr
+    if len(pr):
+        # exec_products' slip_exec already includes the unbenchmarked legs
+        # (exec-only, no decision price) while its slip_total does not, so
+        # the honest per-product figure is drift + exec = the tracker's
+        # exec_cost (slip_total + exec_unbenchmarked) split by product.
+        g = pr.groupby("product").agg(
+            days=("date", "nunique"), lots=("traded_lots", "sum"),
+            notional=("traded_notional", "sum"),
+            drift=("slip_drift", "sum"), exec=("slip_exec", "sum"))
+        g["all_in"] = g["drift"] + g["exec"]
+        g = g.reindex(g["all_in"].abs().sort_values(ascending=False).index)
+
+        def prow(label, r, days):
+            a(f"| {label} | {days} | {r['lots']:.0f} | {r['notional'] / 1e6:.1f} | "
+              f"{_f(r['drift'])} | {_f(r['exec'])} | {_f(r['all_in'])} | "
+              f"{_bps(r['all_in'], r['notional'])} |")
+
+        a("")
+        a("| product | days | lots | notional M | drift | exec (incl. unbench) | all-in | bps |")
+        a("|---|---|---|---|---|---|---|---|")
+        for prod, r in g.head(15).iterrows():
+            prow(prod, r, f"{r['days']:.0f}")
+        rest = g.iloc[15:]
+        if len(rest):
+            prow(f"other ({len(rest)})", rest.sum(numeric_only=True), "-")
+        prow("all products", g.sum(numeric_only=True), "-")
+        a("ranked by |all-in| over the live window (all-in = drift + exec = the "
+          "bridge's exec_cost by product); product bps are vs traded notional")
+    a("")
 
 
 def write_report(day: str, recon: pd.DataFrame, missing: list[str],
@@ -71,7 +139,7 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
           f"(carry {_f(last['bookdiff_carry'])}, new {_f(last['bookdiff_creation'])}) | "
           f"intraday {_f(last.get('intraday_unfilled', 0.0))} | "
           f"residual {_f(last['resid'])} (window-straddled: judge with the next "
-          f"day's) | broker basis {_f(last['broker_basis'])}")
+          f"day's)")
         a(f"  fees {_f(last['fees'])} | broker residual {_f(last['broker_resid'])} "
           f"-> live net {_f(last['live_net'])}")
         a("")
@@ -81,18 +149,17 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
             live = live.assign(intraday_unfilled=0.0)
         cum = live[["expected", "exec_cost", "marking", "bookdiff_carry",
                     "bookdiff_creation", "intraday_unfilled", "resid",
-                    "broker_basis", "live_gross",
-                    "fees", "broker_resid", "live_net"]].sum()
+                    "live_gross", "fees", "broker_resid", "live_net"]].sum()
         a(f"## Cumulative bridge (live since {C.LIVE_START}, "
           f"{len(live)} reconciled days)")
         a("| expected | -exec | +marking | +bookdiff | +intraday | +resid "
-          "| +broker basis | = live gross | -fees | +broker_resid | = live net |")
-        a("|---|---|---|---|---|---|---|---|---|---|---|")
+          "| = live gross | -fees | +broker_resid | = live net |")
+        a("|---|---|---|---|---|---|---|---|---|---|")
         a(f"| {_f(cum['expected'])} | {_f(-cum['exec_cost'])} | "
           f"{_f(cum['marking'])} | "
           f"{_f(cum['bookdiff_carry'] + cum['bookdiff_creation'])} | "
           f"{_f(cum['intraday_unfilled'])} | "
-          f"{_f(cum['resid'])} | {_f(cum['broker_basis'])} | "
+          f"{_f(cum['resid'])} | "
           f"{_f(cum['live_gross'])} | {_f(-cum['fees'])} | "
           f"{_f(cum['broker_resid'])} | {_f(cum['live_net'])} |")
         if missing:
@@ -108,6 +175,8 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
         for name, p in S.windows(live["expected"]).items():
             a(_stat_row(f"bt scaled {name}", p))
         a("")
+
+    _slippage_section(a, day)
 
     a("## Per strategy")
     a("| strategy | live? | bt 2026 pnl (full) | bt scaled+weighted (live window) | "
@@ -179,8 +248,7 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
           + (f"; current series diverges from pins on {div}" if div else "")
           + ("; standing counts -- a divergence is announced as an alert once, "
              "the first run it appears, and kept here afterwards" if div else ""))
-    from . import io_live as _il
-    mt = _il.inbox_ks_summary_mtime()
+    mt = io_live.inbox_ks_summary_mtime()
     if mt:
         import datetime as dt
         a(f"inbox ks summary mtime: "
@@ -229,12 +297,11 @@ def _plot(path, live: pd.DataFrame, bt_series: dict[str, pd.DataFrame],
         "+bookdiff": (live["bookdiff_carry"] + live["bookdiff_creation"]).cumsum().values,
         "+intraday": intraday.cumsum().values,
         "+resid": live["resid"].cumsum().values,
-        "+broker_basis": live["broker_basis"].cumsum().values,
         "-fees": (-live["fees"].cumsum()).values,
     }
     for (col, vals), colr in zip(comp.items(),
                                  ["#a33a2e", "#2f855a", "#805ad5", "#b83280",
-                                  "#9a6b1e", "#2b6cb0", "#4a5568"]):
+                                  "#9a6b1e", "#4a5568"]):
         ax.plot(x, vals, lw=1.4, label=col, color=colr)
     ax.axhline(0, color="black", lw=0.7)
     ax.set_ylabel("CNY (cum)")

@@ -113,8 +113,9 @@ def main(argv=None) -> int:
 
     attribution = (AT.attribute_all(list(recon.index), forward_flags, weights_hist)
                    if len(recon) else pd.DataFrame())
-    flags = (AT.live_flags(list(recon.index), forward_flags, weights_hist)
-             if len(recon) else {k: False for k in C.STRATEGIES})
+    run_days = [d for d in days_needed if d <= today]   # includes today's runs
+    flags = (AT.live_flags(run_days, forward_flags, weights_hist)
+             if run_days else {k: False for k in C.STRATEGIES})
 
     # which divergent pin dates are new THIS run (check_all marks them announced)
     _ann = state.get("bt_pin_divergence_announced", {})

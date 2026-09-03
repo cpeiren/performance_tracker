@@ -42,8 +42,8 @@ Regimes (detected per day from the run records, never by date):
   Weights and component books are pinned per day, first write wins.
 
 The bridge (account-level, gross):
-  live_gross = scale x bt_gross - exec_cost + marking + bookdiff + residual
-               + broker_basis
+  live_gross = scale x bt_gross - exec_cost + marking + bookdiff + intraday
+               + residual
   live_net   = live_gross - fees + broker_residual
 Missing live days accrue into a sticky bucket and are excluded from cum sums.
 As-shipped basis: each live day's backtest inputs are PINNED (data/state.json
