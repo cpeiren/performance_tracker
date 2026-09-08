@@ -205,15 +205,14 @@ def revision_alerts(bt_series: dict[str, pd.DataFrame], state: dict) -> list[str
 def residual_alerts(recon: pd.DataFrame) -> list[str]:
     """Residual break-out, excusing window straddles.
 
-    A backtest day is the 09:00(D) -> 09:00(D+1) window, a live day is
-    settle(D-1) -> settle(D) (reconcile.py, KNOWN LIMITATION).  The leg they
-    do not share -- 15:00(D) -> 09:00(D+1) -- enters expected on D and live
-    on D+1, so a large move there prints a residual of one sign on D and its
-    mirror image on D+1 (2026-09-01: -42.8k, all of it that leg).  A day that
-    breaks out of its trailing distribution is therefore alerted only when
-    NEITHER neighbour offsets it; a day whose predecessor or successor cancels
-    it is the straddle, not attribution.  The latest day has no successor yet
-    and is judged on the next run."""
+    Since 2026-09-08 the bridge re-marks live to the first decision of the
+    day and explains it with the previous backtest row (reconcile.py, WINDOW
+    ALIGNMENT), so the overnight leg no longer straddles for contracts with
+    a 09:00 decision price.  Contracts first decided later (0930/1330) or
+    with no decision price still straddle their own leg, so the neighbour
+    rule stays as the safety net: a day that breaks out of its trailing
+    distribution is alerted only when NEITHER neighbour offsets it.  The
+    latest day has no successor yet and is judged on the next run."""
     alerts: list[str] = []
     if len(recon) < 4 or "resid" not in recon.columns:
         return alerts

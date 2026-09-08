@@ -138,8 +138,8 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
           f"bookdiff {_f(last['bookdiff_carry'] + last['bookdiff_creation'])} "
           f"(carry {_f(last['bookdiff_carry'])}, new {_f(last['bookdiff_creation'])}) | "
           f"intraday {_f(last.get('intraday_unfilled', 0.0))} | "
-          f"residual {_f(last['resid'])} (window-straddled: judge with the next "
-          f"day's)")
+          f"residual {_f(last['resid'])} (live re-marked to first decision, "
+          f"vs the previous backtest row)")
         a(f"  fees {_f(last['fees'])} | broker residual {_f(last['broker_resid'])} "
           f"-> live net {_f(last['live_net'])}")
         a("")

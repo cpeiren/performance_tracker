@@ -10,11 +10,18 @@ Per trading day D and contract c with multiplier m_c:
     dbook_c(D)     = live_net_c(D) - ideal_c(D)
     bench_c(D)     = EOD decision price (1330 snap, fund price, else settle)
 
-    expected_D          = scale_D * sum_i w_i(D) * bt_i(D)
-                          (legacy days: w = 1 on ks_branch + fund_v3 only)
+    expected_D          = scale_D * sum_i w_i(D) * bt_i(D - lag_i)
+                          lag_i = config.BT_ROW_LAG (1 for every 09:00->09:00
+                          series, 0 for stat_arb whose ledger books on the
+                          realisation date); legacy days: w = 1 on
+                          ks_branch + fund_v3 only
     exec_cost_D         = slip_total_D + exec_unbenchmarked_D    (+ = cost)
     marking_D           = basis(D) - basis(D-1)
         basis(D) = sum_c live_net_c(D) * (settle_c(D) - bench_c(D)) * m_c
+        bench_c(D) = the day's FIRST decision price (09:00 snap; 0930/1330
+        for contracts first decided then), so for a held book
+        live_D - marking_D = sum_c pos_c * (bench_c(D) - bench_c(D-1)) * m_c
+        = the 09:00(D-1) -> 09:00(D) window = backtest row D-1
     bookdiff_carry_D    = sum_c dbook_c(D-1) * (settle_c(D) - settle_c(D-1)) * m_c
     bookdiff_creation_D = sum_c (dbook_c(D) - dbook_c(D-1)) * (settle_c(D) - bench_c(D)) * m_c
     intraday_unfilled_D = per-snap deviation term (see tracker/intraday.py):
@@ -42,13 +49,18 @@ rounding at small scale, unfilled legs, BLOCKED runs, manual intervention --
 with no double count against slippage (which prices filled lots only).
 ``resid`` closes the identity; its magnitude is the tracker's quality metric.
 
-KNOWN LIMITATION (day-window mismatch): a backtest day D spans snap 0900(D)
+WINDOW ALIGNMENT (fixed 2026-09-08): a backtest row D spans snap 0900(D)
 through the overnight leg into D+1, while a live trading day spans
-settle(D-1) -> settle(D).  Daily terms therefore straddle windows and the
-same-day expected can even anti-correlate with live on short samples; the
-CUMULATIVE curves differ only by boundary legs.  Judge daily residuals by
-their trailing distribution, not day by day.  Revisit alignment once 30+
-live days exist.
+settle(D-1) -> settle(D).  The marking term re-marks the live day to
+first-decision -> first-decision, which is the 09:00(D-1) -> 09:00(D)
+window, so live day D is bridged against backtest row D-1 (BT_ROW_LAG).
+Until then the bench was the LAST decision (1330) and expected was row D:
+every overnight leg landed in resid with one sign on D and the mirror on
+D+1 (resid_D ~ scale x (N_{D-1} - N_D), N = 13:30 -> next 09:00 leg), and a
+weekend leg made 2026-09-04's residual -85,775 on a -18,290 live day.  What
+remains in resid is real: contracts without any decision price (marking
+zeroed), intraday rebalances the single-book terms cannot see, and model
+vs shipped-book pricing differences.
 """
 
 from __future__ import annotations
@@ -231,11 +243,13 @@ def weighted_bt(bt: pd.DataFrame, forward_flags: dict[str, bool],
                 ) -> tuple[pd.DataFrame, list[str], dict[str, list[str]]]:
     """Per-day WEIGHTED full-size backtest frame for the live window.
 
-    date x strategy-key, value = w_i(day) * bt_i(day).  Legacy days weight
-    ks_branch + fund_v3 at 1 and everything else 0 (the account traded those
-    two books unweighted).  Forward days use the day's shipped merge weights,
-    carrying the latest earlier day's forward when the day's own are not
-    shipped yet.
+    date x strategy-key, value = w_i(day) * bt_i(row explaining day), where
+    the row is BT_ROW_LAG trading days (of the backtest calendar) before the
+    live day -- the previous row for every 09:00 -> 09:00 series, the day's
+    own row for stat_arb.  Legacy days weight ks_branch + fund_v3 at 1 and
+    everything else 0 (the account traded those two books unweighted).
+    Forward days use the day's shipped merge weights, carrying the latest
+    earlier day's forward when the day's own are not shipped yet.
 
     A strategy with nonzero weight but NO mature backtest row makes the
     day's expected UNKNOWN, not smaller: the day is listed in the returned
@@ -250,10 +264,12 @@ def weighted_bt(bt: pd.DataFrame, forward_flags: dict[str, bool],
 
     problems: list[str] = []
     incomplete: dict[str, list[str]] = {}
-    days = [d for d in bt.index if d >= C.LIVE_START]
+    all_days = list(bt.index)
+    days = [d for d in all_days if d >= C.LIVE_START]
     out = pd.DataFrame(0.0, index=days, columns=list(C.STRATEGIES))
     out.index.name = "date"
     for d in days:
+        pos = all_days.index(d)
         if forward_flags.get(d):
             w, exact = io_backtest.weights_for_day(d, weights_hist)
             if w is None:
@@ -272,7 +288,10 @@ def weighted_bt(bt: pd.DataFrame, forward_flags: dict[str, bool],
         for key, wi in w.items():
             if not wi:
                 continue
-            v = bt.at[d, key] if key in bt.columns else float("nan")
+            lag = C.BT_ROW_LAG.get(key, C.DEFAULT_BT_ROW_LAG)
+            row = all_days[pos - lag] if pos - lag >= 0 else None
+            v = (bt.at[row, key] if row is not None and key in bt.columns
+                 else float("nan"))
             if pd.notna(v):
                 out.at[d, key] = wi * float(v)
             else:

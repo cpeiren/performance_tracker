@@ -355,22 +355,22 @@ def fund_prices(day: str) -> dict[str, float]:
 
 
 def bench_prices(day: str) -> dict[str, float]:
-    """End-of-day decision price per ticker: latest snap, then fund price.
+    """First decision price of the day per ticker (the backtest window start),
+    then fund price.
 
-    Snap files are tried from the forward meta first (the only set guaranteed
-    once the legacy per-source ships stop at Phase 5), then the legacy ks
-    meta.  A contract with no decision price falls back to its settle
-    downstream, which zeroes its marking term by construction.
+    Snaps are folded in preference order (config.SNAP_PREFERENCE, earliest
+    first) and a ticker keeps the FIRST price seen, so a contract decided only
+    from 0930 on (ksext) or 1330 on gets that snap's price rather than no
+    bench.  Forward meta first (the only set guaranteed once the legacy
+    per-source ships stop at Phase 5), then the legacy ks meta.  A contract
+    with no decision price at all falls back to its settle downstream, which
+    zeroes its marking term by construction.
     """
     out: dict[str, float] = {}
     for source in (C.FORWARD_SOURCE, "ks"):
-        for snap in C.SNAP_PREFERENCE:  # first snap that exists is the EOD set
-            prices = snap_prices(day, snap, source=source)
-            if prices:
-                out.update(prices)
-                break
-        if out:
-            break
+        for snap in C.SNAP_PREFERENCE:
+            for t, px in (snap_prices(day, snap, source=source) or {}).items():
+                out.setdefault(t, px)
     for t, px in fund_prices(day).items():
         out.setdefault(t, px)
     return out

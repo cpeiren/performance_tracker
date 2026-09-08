@@ -59,11 +59,17 @@ staleness, ks cross-check.
   fires only when a value actually moved; dates carried by the pins are left
   to the BT REVISED vs PINS alert.  (Until 2026-09-02 it hashed the whole
   stable region, which grows daily, so it fired for all seven books every day.)
-- RESIDUAL excuses window straddles: a backtest day is 09:00(D)->09:00(D+1),
-  a live day is settle(D-1)->settle(D); the unshared 15:00(D)->09:00(D+1) leg
-  prints mirror-image residuals on D and D+1.  A break-out is alerted only
-  when neither neighbouring day offsets it; the latest day is judged once the
-  next one reconciles.
+- Window alignment (2026-09-08): a backtest row D is 09:00(D)->09:00(D+1),
+  a live day is settle(D-1)->settle(D).  The marking term benchmarks at each
+  contract's FIRST decision price of the day, so live re-marked is
+  09:00(D-1)->09:00(D), and live day D is bridged against backtest row D-1
+  (config.BT_ROW_LAG; stat_arb's ledger already books on the realisation
+  date, lag 0).  Before this the bench was the last decision (1330) and the
+  row was D: every overnight leg sat in the residual with one sign on D and
+  its mirror on D+1, and the 2026-09-04 weekend leg alone was -85.8k.
+- RESIDUAL still excuses a break-out that a neighbouring day mirrors
+  (contracts first decided after 09:00, or with no decision price, straddle
+  their own leg); the latest day is judged once the next one reconciles.
 
 Tests: `python -m pytest tests/` (pure functions only; nothing touches the
 box).

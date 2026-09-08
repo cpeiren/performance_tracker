@@ -96,8 +96,24 @@ LIVE_START = "2026-08-18"
 #: OOS window the tracker reports on.
 OOS_START = "2026-01-01"
 
-#: End-of-day decision price preference for the marking benchmark.
-SNAP_PREFERENCE = ("1330", "1030", "0930", "0900")
+#: Decision-price preference for the marking benchmark: the FIRST decision
+#: of the day per contract, i.e. the start of the backtest window.  A
+#: backtest row for day D prices the book from the 09:00 snap on D to the
+#: 09:00 snap on D+1 (every shipped series except stat_arb, see BT_ROW_LAG);
+#: a live day runs settle(D-1) -> settle(D).  Benchmarking at the day's first
+#: decision makes ``live - marking`` equal the 09:00(D-1) -> 09:00(D) window,
+#: which is the PREVIOUS day's backtest row -- hence the lag below.  Until
+#: 2026-09-08 the bench was the LAST decision (1330), which aligned live to
+#: 13:30 -> 13:30 and left every overnight leg in the residual
+#: (2026-09-04: -85,775 of a -88,782 cumulative residual was that leg).
+SNAP_PREFERENCE = ("0900", "0930", "1030", "1330")
+
+#: Which backtest row explains live day D, per strategy: live day D (re-marked
+#: to its first decision) covers 09:00(D-1) -> 09:00(D), so the default row is
+#: the trading day BEFORE D (lag 1).  stat_arb's ledger already books P&L on
+#: the realisation date (row D = morning TWAP D-1 -> morning TWAP D), lag 0.
+DEFAULT_BT_ROW_LAG = 1
+BT_ROW_LAG = {"stat_arb": 0}
 
 #: |residual| alert threshold: max(RESID_ABS_FLOOR, RESID_REL * |live_gross|).
 RESID_ABS_FLOOR = 500.0
