@@ -5,13 +5,10 @@
 - WEIGHTS CHANGE on 2026-09-01: ks_ext: 0.0->0.25.
 - WEIGHTS CHANGE on 2026-09-02: stat_arb: 1.0->0.0.
 - WEIGHTS CHANGE on 2026-09-03: stat_arb: 0.0->1.0.
-- BT REVISED vs PINS: agri_event current history differs from pinned as-shipped values on 1 new live-window day(s) (max |diff| 5680 CNY, first 2026-09-02); the bridge keeps the pins.
 - MISSING LIVE DAY 2026-08-28: trading day with a backtest row but no daily_pnl/state file; excluded from the bridge, expected pnl held in the missing-day bucket.
 - SCALE 2026-08-28: no usable run record; previous scale carried forward.
 - SCALE CHANGE on 2026-08-27: now 0.2.
 - SCALE CHANGE on 2026-09-01: now 0.5.
-- BACKTEST REVISED: fund_v3 -- 135 mature row(s) changed since last run (net -1894 CNY, largest 2026-05-27 -4989 -> -6366; first 2026-01-05, last 2026-08-17). Regeneration upstream; baseline re-set.
-- BACKTEST REVISED: stat_arb -- 21 mature row(s) changed since last run (net -18 CNY, largest 2026-04-08 +21395 -> +18253; first 2026-01-13, last 2026-08-13). Regeneration upstream; baseline re-set.
 - SLIPPAGE 2026-09-08: 5 unbenchmarked leg(s), +135 CNY exec cost without a shipped decision price.
 - BROKER DIFF 2026-09-08: daily_summary diff_vs_broker = -3040.00 CNY (should be 0).
 - RESIDUAL 2026-08-27: -17482 CNY vs trailing median |resid| 1250, offset by neither neighbour (2026-08-26 +2944, 2026-08-31 -22890) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
@@ -90,9 +87,25 @@ ranked by |all-in| over the live window (all-in = drift + exec = the bridge's ex
 | neither bucket (no target) | - | - | - | -4,605 | inherited/manual/rounding |
 forward-day attribution is pro-rated by weighted full-size lots; legacy days remain exclusive-holder.
 
+## Per strategy gap by day, last 10 reconciled days (live attributed - expected, CNY)
+| day | ks_branch | fund_v3 | china_pairs | ks_ext | chem_fund | agri_event | stat_arb | total |
+|---|---|---|---|---|---|---|---|---|
+| 2026-08-24 | +3,066 | +682 | +0 | +0 | +0 | +0 | +0 | +3,749 |
+| 2026-08-25 | +7,289 | -737 | +0 | +0 | +0 | +0 | +0 | +6,552 |
+| 2026-08-26 | -4,102 | +3,347 | +0 | +0 | +0 | +0 | +0 | -755 |
+| 2026-08-27 | -10,253 | -7,970 | +0 | +0 | +0 | +0 | +0 | -18,223 |
+| 2026-08-31 | +413 | +49,833 | -2,804 | +0 | -19,031 | +1,960 | +244 | +30,614 |
+| 2026-09-01 | +17,681 | -29,415 | -2,790 | +54 | -9,023 | -4,782 | -3,186 | -31,459 |
+| 2026-09-02 | +13,512 | -99,657 | -22,485 | +1,282 | +15,964 | +426 | +0 | -90,958 |
+| 2026-09-03 | -12,509 | +43,683 | -4,578 | +2,302 | -12,407 | +7,612 | +5,220 | +29,323 |
+| 2026-09-04 | +6,112 | +10,838 | -9,893 | -1,861 | -6,843 | +1,891 | -4,736 | -4,492 |
+| 2026-09-07 | +10,211 | -174 | +8,457 | +5,402 | +11,696 | -6,594 | +3,487 | +32,484 |
+| sum | +31,420 | -29,569 | -34,093 | +7,179 | -19,644 | +513 | +1,030 | -43,164 |
+full series: data/per_strategy_daily.csv (day, strategy, expected, attributed, gap); a strategy's daily total foots to expected - live_gross once the shared and neither buckets are added.
+
 ## Data health
 scale: 0.5 (since 2026-09-01)
 regime: forward (merged weighted book) since 2026-08-31; 6 forward day(s), 8 legacy day(s)
 merge weights (2026-09-08): ks_branch 0.8, fund_v3 2, china_pairs 1.5, ks_ext 0.25, chem_fund 1.5, agri_event 1, stat_arb 1
-as-shipped pins: 15 live day(s) pinned; current series diverges from pins on fund_v3: 11 day(s), max 22,922 CNY, ks_branch: 9 day(s), max 35,915 CNY, stat_arb: 11 day(s), max 7,622 CNY, ks_ext: 2 day(s), max 950 CNY, agri_event: 4 day(s), max 5,680 CNY, 1 NEW; standing counts -- a divergence is announced as an alert once, the first run it appears, and kept here afterwards
+as-shipped pins: 15 live day(s) pinned; current series diverges from pins on fund_v3: 11 day(s), max 22,922 CNY, ks_branch: 9 day(s), max 35,915 CNY, stat_arb: 11 day(s), max 7,622 CNY, ks_ext: 2 day(s), max 950 CNY, agri_event: 4 day(s), max 5,680 CNY; standing counts -- a divergence is announced as an alert once, the first run it appears, and kept here afterwards
 inbox ks summary mtime: 2026-09-08 05:52 UTC
