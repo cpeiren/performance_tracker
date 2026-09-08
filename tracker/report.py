@@ -34,6 +34,35 @@ def _bps(cny: float, notional: float) -> str:
     return f"{1e4 * cny / notional:+.2f}" if notional else "-"
 
 
+def per_strategy_daily(live: pd.DataFrame, bt_bridge: pd.DataFrame | None,
+                       attribution: pd.DataFrame) -> pd.DataFrame:
+    """Per-day, per-strategy expected vs live-attributed pnl, long format.
+
+    Columns: day, strategy, expected, attributed, gap (= attributed -
+    expected). ``expected`` is the bridge's per-strategy weighted full-size
+    row times that day's scale -- the same numbers the "Per strategy" table
+    sums over the whole live window, so the per-strategy gaps foot to
+    ``expected - live_gross`` there. A strategy absent from either input on
+    a day contributes 0 for that side. Pure: no I/O.
+    """
+    rows = []
+    if not len(live):
+        return pd.DataFrame(columns=["day", "strategy", "expected", "attributed", "gap"])
+    scale = live["scale"] if "scale" in live.columns else pd.Series(1.0, index=live.index)
+    for key in C.STRATEGIES:
+        exp = pd.Series(0.0, index=live.index)
+        if bt_bridge is not None and key in bt_bridge.columns:
+            exp = bt_bridge[key].reindex(live.index).fillna(0.0) * scale
+        att = pd.Series(0.0, index=live.index)
+        if len(attribution) and key in attribution.columns:
+            att = attribution[key].reindex(live.index).fillna(0.0)
+        for day in live.index:
+            e, l = float(exp[day]), float(att[day])
+            rows.append({"day": day, "strategy": key, "expected": e,
+                         "attributed": l, "gap": l - e})
+    return pd.DataFrame(rows, columns=["day", "strategy", "expected", "attributed", "gap"])
+
+
 def _slippage_section(a, day: str, n_days: int = 10) -> None:
     """Execution cost from pyexec's analysis files (the exec_cost source):
     daily bps with the drift/exec split, the live-window total, and the
@@ -219,6 +248,30 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
         a("forward-day attribution is pro-rated by weighted full-size lots; "
           "legacy days remain exclusive-holder.")
     a("")
+
+    # Per-strategy per-DAY gaps, so a sleeve's shortfall can be judged on its
+    # trailing distribution (the table above only sums the window). The full
+    # long-format series goes to data/per_strategy_daily.csv.
+    psd = per_strategy_daily(live, bt_bridge, attribution)
+    if len(psd):
+        psd.to_csv(C.DATA / "per_strategy_daily.csv", index=False)
+        n_tail = 10
+        gap = psd.pivot(index="day", columns="strategy", values="gap").fillna(0.0)
+        cols = [k for k in C.STRATEGIES if k in gap.columns]
+        tail = gap[cols].tail(n_tail)
+        a(f"## Per strategy gap by day, last {len(tail)} reconciled days "
+          "(live attributed - expected, CNY)")
+        a("| day | " + " | ".join(cols) + " | total |")
+        a("|---|" + "---|" * (len(cols) + 1))
+        for day, row in tail.iterrows():
+            a(f"| {day} | " + " | ".join(_f(row[c]) for c in cols)
+              + f" | {_f(row[cols].sum())} |")
+        a(f"| sum | " + " | ".join(_f(tail[c].sum()) for c in cols)
+          + f" | {_f(tail[cols].sum().sum())} |")
+        a("full series: data/per_strategy_daily.csv (day, strategy, expected, "
+          "attributed, gap); a strategy's daily total foots to expected - "
+          "live_gross once the shared and neither buckets are added.")
+        a("")
 
     a("## Data health")
     if len(scales):
