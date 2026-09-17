@@ -5,6 +5,7 @@ history) live in data/state.json."""
 from __future__ import annotations
 
 import datetime as dt
+import importlib.util
 
 import pandas as pd
 
@@ -52,6 +53,7 @@ def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame
                           f"bookdiff terms are wrong for that day.")
 
     # -- join integrity: nothing may be dropped silently -------------------
+    alerts += mirror_drift_alerts()
     alerts += join_integrity_alerts(recon)
 
     # -- current series vs pinned as-shipped values -----------------------
@@ -175,6 +177,52 @@ def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame
                               f"from inbox summary on {len(bad)} date(s), max "
                               f"|diff| {bad.max():.0f} CNY (first: {bad.index[0]}).")
     return alerts
+
+
+#: The production module tracker/names.py is a hand-copy of.  Only present
+#: on the box, which is the only place the two can be compared.
+PYEXEC_NAMES = C.CNEXEC / "pyexec" / "names.py"
+
+#: One contract per naming rule: CFFEX (uppercase root), CZCE (uppercase root
+#: AND one year digit), everything else (lowercase, two year digits).
+_MIRROR_FIXTURE = [f"{sym} {mon}26" for sym in
+                   ("if", "ih", "im", "ic", "rb", "cs", "zn", "SA", "CF", "PL",
+                    "MA", "UR")
+                   for mon in ("Jan", "Jun", "Dec")]
+
+
+def mirror_drift_alerts() -> list[str]:
+    """Behaviour diff of tracker/names.py against the module it mirrors.
+
+    A hand-copied module that cannot notice its own staleness is the failure
+    mode this exists for: on 2026-09-17 the mirror was found to predate
+    pyexec's F118 casing rule, so every CFFEX leg resolved to a ticker the
+    live side does not use -- for weeks, silently.  Compared here rather than
+    in a test because the daily report is what somebody actually reads.
+    Never raises: a missing or unloadable production module is simply no
+    comparison.
+    """
+    try:
+        if not PYEXEC_NAMES.exists():
+            return []
+        spec = importlib.util.spec_from_file_location("_pyexec_names",
+                                                      PYEXEC_NAMES)
+        prod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(prod)
+        bad = [c for c in _MIRROR_FIXTURE
+               if names.contract_ticker_candidates(c)
+               != prod.contract_ticker_candidates(c)]
+    except Exception as exc:  # noqa: BLE001 - never break the run over this
+        return [f"NAMES MIRROR: could not compare tracker/names.py with "
+                f"{PYEXEC_NAMES} ({type(exc).__name__}: {exc}); ticker "
+                f"resolution is unverified."]
+    if not bad:
+        return []
+    shown = ", ".join(f"{c} -> {names.preferred_ticker(c)} "
+                      f"(pyexec: {prod.preferred_ticker(c)})" for c in bad[:3])
+    return [f"NAMES MIRROR DRIFT: tracker/names.py disagrees with "
+            f"{PYEXEC_NAMES} on {len(bad)} contract name(s) -- {shown}. Those "
+            f"legs join nothing on the live side: re-sync the mirror."]
 
 
 def join_integrity_alerts(recon: pd.DataFrame) -> list[str]:

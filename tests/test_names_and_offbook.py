@@ -228,3 +228,45 @@ def test_unresolvable_shipped_name_alerts():
     names.UNRESOLVED.clear()
     assert len(out) == 1 and out[0].startswith("NAMES UNRESOLVED")
     assert "if Dec26x" in out[0]
+
+
+# ---------------------------------------------------- mirror drift check ----
+
+_STALE_MIRROR = '''
+CZCE_SYMBOLS = {"CF", "SA", "MA", "UR", "PL"}
+
+
+def contract_ticker_candidates(contract):
+    sym, my = contract.split()
+    mon = {"Jan": "01", "Jun": "06", "Dec": "12"}[my[:-2]]
+    y = my[-2:]
+    three, four = f"{sym}{y[1]}{mon}", f"{sym}{y}{mon}"
+    return [three, four] if sym.upper() in CZCE_SYMBOLS else [four, three]
+
+
+def preferred_ticker(contract):
+    return contract_ticker_candidates(contract)[0]
+'''
+
+
+def test_no_drift_alert_without_the_production_module(monkeypatch, tmp_path):
+    monkeypatch.setattr(A, "PYEXEC_NAMES", tmp_path / "absent.py")
+    assert A.mirror_drift_alerts() == []
+
+
+def test_the_pre_f118_mirror_is_caught(monkeypatch, tmp_path):
+    """The exact staleness that caused 2026-09-15: no CFFEX casing rule."""
+    p = tmp_path / "names.py"
+    p.write_text(_STALE_MIRROR, encoding="utf-8")
+    monkeypatch.setattr(A, "PYEXEC_NAMES", p)
+    out = A.mirror_drift_alerts()
+    assert len(out) == 1 and out[0].startswith("NAMES MIRROR DRIFT")
+    assert "if Jan26" in out[0]
+
+
+def test_unloadable_production_module_is_reported_not_raised(monkeypatch, tmp_path):
+    p = tmp_path / "names.py"
+    p.write_text("this is not python(", encoding="utf-8")
+    monkeypatch.setattr(A, "PYEXEC_NAMES", p)
+    out = A.mirror_drift_alerts()
+    assert len(out) == 1 and out[0].startswith("NAMES MIRROR:")
