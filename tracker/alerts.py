@@ -9,7 +9,7 @@ import datetime as dt
 import pandas as pd
 
 import config as C
-from . import io_backtest, io_live
+from . import io_backtest, io_live, names
 from .dates import as_date, business_days_between, is_weekday, normalize_date
 
 
@@ -50,6 +50,9 @@ def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame
             alerts.append(f"FORWARD BOOK {last_fwd}: merged book absent from "
                           f"inbox/forward -- ideal book fell back to empty; "
                           f"bookdiff terms are wrong for that day.")
+
+    # -- join integrity: nothing may be dropped silently -------------------
+    alerts += join_integrity_alerts(recon)
 
     # -- current series vs pinned as-shipped values -----------------------
     # Each newly-divergent date is announced once; the standing count lives
@@ -171,6 +174,59 @@ def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame
                 alerts.append(f"KS CROSS-CHECK: shipped ks_branch series differs "
                               f"from inbox summary on {len(bad)} date(s), max "
                               f"|diff| {bad.max():.0f} CNY (first: {bad.index[0]}).")
+    return alerts
+
+
+def join_integrity_alerts(recon: pd.DataFrame) -> list[str]:
+    """Nothing the bridge reads may vanish quietly.
+
+    Three ways a contract can drop out of the decomposition without anyone
+    being told, all of them found on 2026-09-17:
+
+      * its shipped human name does not parse to a ticker (names.resolve
+        records instead of skipping);
+      * it is held but has no shipped decision price, so its marking,
+        creation and intraday terms are zero by construction and its P&L
+        lands in the residual;
+      * no shipped book names it at all, so there is no backtest row behind
+        it -- the bridge now prices it verbatim, and says so.
+    """
+    alerts: list[str] = []
+    if names.UNRESOLVED:
+        worst = sorted(names.UNRESOLVED.items(), key=lambda kv: -kv[1])[:5]
+        alerts.append(
+            f"NAMES UNRESOLVED: {len(names.UNRESOLVED)} contract name(s) in "
+            f"shipped files do not parse to a ticker and were dropped "
+            f"({', '.join(n for n, _ in worst)}) -- those legs are missing "
+            f"from the ideal book, the decision prices, or both.")
+    if not len(recon):
+        return alerts
+
+    last_day, last_row = recon.index[-1], recon.iloc[-1]
+    held = float(last_row.get("live_gross_notional", 0.0) or 0.0)
+    nb_notional = float(last_row.get("nobench_notional", 0.0) or 0.0)
+    if held > 0 and (held - nb_notional) / held < C.BENCH_COVERAGE_MIN:
+        alerts.append(
+            f"BENCH COVERAGE {last_day}: "
+            f"{int(last_row.get('n_nobench', 0) or 0)} held contract(s), "
+            f"{nb_notional / 1e6:.1f}M ({100 * nb_notional / held:.0f}% of held "
+            f"notional), have no shipped decision price -- their marking and "
+            f"intraday terms are zeroed by construction and their P&L lands in "
+            f"the residual.")
+    n_ob = int(last_row.get("n_offbook", 0) or 0)
+    ob_pnl = float(last_row.get("offbook_pnl", 0.0) or 0.0)
+    if n_ob and abs(ob_pnl) >= C.OFFBOOK_ALERT_CNY:
+        who = str(last_row.get("offbook_tickers", "") or "")
+        alerts.append(
+            f"OFF-BOOK {last_day}: {n_ob} held contract(s) that no shipped book "
+            f"names ({who}) earned {ob_pnl:+.0f} CNY, taken verbatim from the "
+            f"executor's per-symbol P&L; no model targets them.")
+    if int(last_row.get("n_offbook_traded", 0) or 0):
+        alerts.append(
+            f"OFF-BOOK TRADED {last_day}: the executor traded "
+            f"{int(last_row['n_offbook_traded'])} contract(s) no shipped book "
+            f"names -- decide who owns them; until then their execution cost is "
+            f"counted twice and the difference returns to the residual.")
     return alerts
 
 

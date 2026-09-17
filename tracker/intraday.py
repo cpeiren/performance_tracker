@@ -59,8 +59,15 @@ def _bench_at(price_sets: list[tuple[dt.datetime, dict]],
 
 
 def unfilled_between_snaps(day: str, prev_positions: dict, dbook_prev: dict,
-                           mult_map: dict[str, float]) -> tuple[float, dict]:
-    """(intraday_unfilled, diagnostics) for one day.  Never raises."""
+                           mult_map: dict[str, float],
+                           exclude: set[str] | None = None) -> tuple[float, dict]:
+    """(intraday_unfilled, diagnostics) for one day.  Never raises.
+
+    ``exclude`` is the bridge's off-book set: contracts the ideal book never
+    names carry their realized P&L verbatim in their own term, so pricing
+    their intraday deviation here would double count.
+    """
+    exclude = exclude or set()
     diag = {"n_runs": 0, "n_runs_used": 0, "runs_without_targets": 0,
             "n_unpriced": 0, "n_dev_contracts": 0}
     try:
@@ -105,7 +112,7 @@ def unfilled_between_snaps(day: str, prev_positions: dict, dbook_prev: dict,
                         continue
                     total += d * (p1 - p0) * m
             dev: dict[str, float] = {}
-            for c in set(pos) | set(targets):
+            for c in (set(pos) | set(targets)) - exclude:
                 d = (pos.get(c, 0.0) - float(targets.get(c, 0) or 0)
                      - float(dbook_prev.get(c, 0.0)))
                 if d:

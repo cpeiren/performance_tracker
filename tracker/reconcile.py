@@ -28,12 +28,16 @@ Per trading day D and contract c with multiplier m_c:
                           the desired-vs-achieved book BETWEEN runs, priced
                           decision-to-decision -- disjoint from the bookdiff
                           terms by construction
+    offbook_D           = sum of pyexec's per-symbol total_pnl over contracts
+                          NEITHER day's ideal book names; those contracts are
+                          excluded from every other term
     resid_D             = live_gross_D - expected_D + exec_cost_D
                           - marking_D - bookdiff_carry_D - bookdiff_creation_D
-                          - intraday_unfilled_D
+                          - intraday_unfilled_D - offbook_D
 
     live_gross_D = expected_D - exec_cost_D + marking_D + bookdiff_carry_D
-                   + bookdiff_creation_D + intraday_unfilled_D + resid_D   (exact)
+                   + bookdiff_creation_D + intraday_unfilled_D + offbook_D
+                   + resid_D                                          (exact)
     live_net_D   = live_gross_D - fees_D + broker_resid_D
 
 live_gross_D is pyexec's settle-marked sum (holding + trading per contract,
@@ -48,6 +52,21 @@ marking basis so its CUMULATIVE value is just the current open book's basis
 rounding at small scale, unfilled legs, BLOCKED runs, manual intervention --
 with no double count against slippage (which prices filled lots only).
 ``resid`` closes the identity; its magnitude is the tracker's quality metric.
+
+OFF-BOOK CONTRACTS (2026-09-17).  A contract named by neither day's ideal
+book has no backtest row behind it and, being outside the shipped universe,
+usually no decision price either -- so marking, bookdiff_creation and the
+intraday term all evaluate to zero for it, and every lot it TRADES landed in
+resid at full size, growing without bound.  The executor already knows that
+number exactly (pnl/daily_pnl_<D>.csv: holding + trading, settle-marked), so
+the bridge takes it verbatim as its own line and drops those contracts from
+the priced terms.  resid is then confined to contracts the ensemble actually
+targets, which is what it is supposed to measure.
+Caveat: exec_cost comes from the account-level exec_summary and is not split
+per contract, so an off-book contract that TRADES has its execution counted
+both inside its verbatim P&L and in exec_cost, and the difference returns to
+resid.  The off-book set is meant to be inherited or manual lots that do not
+trade; ``n_offbook_traded`` in the bridge row is the tripwire.
 
 WINDOW ALIGNMENT (fixed 2026-09-08): a backtest row D spans snap 0900(D)
 through the overnight leg into D+1, while a live trading day spans
@@ -122,9 +141,24 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
     if prev_scale is None:
         prev_scale = scale
 
+    # -- off-book contracts ------------------------------------------------
+    held = ({t for t, (net, _) in live_pos.items() if net}
+            | {t for t, (net, _) in prev_pos.items() if net})
+    offbook = {t for t in held
+               if io_live.lookup(full, t) is None
+               and io_live.lookup(prev_full, t) is None}
+    offbook_pnl, n_offbook_rows = io_live.symbol_pnl(day, offbook)
+    traded = {t: True for legs in io_live.fills_by_run(day).values()
+              for t, v in legs.items() if v}
+    n_offbook_traded = sum(1 for t in offbook
+                           if io_live.lookup(traded, t) is not None)
+    pos_b = {t: v for t, v in live_pos.items() if t not in offbook}
+    prev_pos_b = {t: v for t, v in prev_pos.items() if t not in offbook}
+
     # -- marking basis ----------------------------------------------------
-    def basis(pos: dict, settles_: dict, mults: dict, bench_: dict) -> tuple[float, int]:
-        tot, nobench = 0.0, 0
+    def basis(pos: dict, settles_: dict, mults: dict,
+              bench_: dict) -> tuple[float, int, float]:
+        tot, nobench, nobench_notional = 0.0, 0, 0.0
         for t, (net, m) in pos.items():
             if net == 0 or not m:
                 continue
@@ -134,14 +168,31 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
             b = io_live.lookup(bench_, t)
             if b is None:
                 nobench += 1
+                nobench_notional += abs(net) * s * m
                 continue  # bench falls back to settle -> term 0
             tot += net * (s - b) * m
-        return tot, nobench
+        return tot, nobench, nobench_notional
 
-    basis_now, n_nobench = basis(live_pos, settle, mult, bench)
+    basis_now, n_nobench, nobench_notional = basis(pos_b, settle, mult, bench)
     bench_prev = io_live.bench_prices(prev_day) if prev_day else {}
-    basis_prev, _ = basis(prev_pos, prev_settle, prev_mult, bench_prev)
+    basis_prev, _, _ = basis(prev_pos_b, prev_settle, prev_mult, bench_prev)
     marking = basis_now - basis_prev
+
+    # -- benchmarked-on-time coverage --------------------------------------
+    # A backtest row spans 0900 -> 0900, so a contract first decided at 0930 or
+    # later is benchmarked late and straddles its own overnight leg.  Counted,
+    # not corrected: the fix is to ship that contract's price at 0900.
+    bench_snap = io_live.bench_prices_with_snap(day)
+    n_late, late_notional = 0, 0.0
+    on_time = (C.SNAP_PREFERENCE[0], "fund")
+    for t, (net, m) in pos_b.items():
+        if net == 0 or not m:
+            continue
+        hit = io_live.lookup(bench_snap, t)
+        if hit is None or hit[1] in on_time:
+            continue
+        n_late += 1
+        late_notional += abs(net) * (io_live.lookup(settle, t) or 0.0) * m
 
     # -- book differences -------------------------------------------------
     def dbook(pos: dict, full_book: dict, s: float) -> dict[str, float]:
@@ -154,8 +205,8 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
                 out[t] = d
         return out
 
-    db_now = dbook(live_pos, full, scale)
-    db_prev = dbook(prev_pos, prev_full, prev_scale) if prev_day else {}
+    db_now = dbook(pos_b, full, scale)
+    db_prev = dbook(prev_pos_b, prev_full, prev_scale) if prev_day else {}
 
     def mult_of(t: str) -> float:
         return mult.get(t) or prev_mult.get(t) or 0.0
@@ -187,7 +238,7 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
     # prices yesterday's standing deviation) and from creation (which prices
     # the last run's deviation from its bench to settle).
     intraday_unfilled, intraday_diag = intr.unfilled_between_snaps(
-        day, prev_pos, db_prev, {**prev_mult, **mult})
+        day, prev_pos_b, db_prev, {**prev_mult, **mult}, exclude=offbook)
 
     # -- assemble ----------------------------------------------------------
     summ = io_live.daily_summary()
@@ -206,7 +257,7 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
 
     expected = scale * bt_gross
     resid = (live_gross - expected + exec_cost - marking - carry - creation
-             - intraday_unfilled)
+             - intraday_unfilled - offbook_pnl)
 
     gross_book = sum(abs(net) * (io_live.lookup(settle, t) or 0.0) * m
                      for t, (net, m) in live_pos.items())
@@ -227,6 +278,11 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
         "intraday_unfilled": intraday_unfilled,
         "intraday_runs_used": intraday_diag.get("n_runs_used", 0),
         "intraday_unpriced": intraday_diag.get("n_unpriced", 0),
+        "offbook_pnl": offbook_pnl,
+        "n_offbook": len(offbook),
+        "n_offbook_rows": n_offbook_rows,
+        "n_offbook_traded": n_offbook_traded,
+        "offbook_tickers": " ".join(sorted(offbook)),
         "resid": resid,
         "live_gross": live_gross,
         "fees": fees,
@@ -234,6 +290,9 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
         "live_net": live_net,
         "n_live_contracts": sum(1 for v in live_pos.values() if v[0] != 0),
         "n_nobench": n_nobench,
+        "nobench_notional": nobench_notional,
+        "n_bench_late": n_late,
+        "bench_late_notional": late_notional,
         "live_gross_notional": gross_book,
     }
 

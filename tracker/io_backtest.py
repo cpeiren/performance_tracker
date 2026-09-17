@@ -100,9 +100,8 @@ def component_books(day: str) -> dict[str, dict[str, float]]:
             raw = json.load(fh)
         b: dict[str, float] = {}
         for human, lots in raw.items():
-            try:
-                t = names.preferred_ticker(human)
-            except ValueError:
+            t = names.resolve(human)
+            if t is None:
                 continue
             b[t] = b.get(t, 0.0) + float(lots)
         out[key] = b

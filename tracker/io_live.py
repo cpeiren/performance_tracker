@@ -58,6 +58,28 @@ def daily_pnl(day: str) -> pd.DataFrame | None:
     return df[~df["symbol"].astype(str).str.startswith("_")].reset_index(drop=True)
 
 
+def symbol_pnl(day: str, tickers) -> tuple[float, int]:
+    """(summed gross total_pnl, n symbols matched) for `tickers` on one day.
+
+    The executor's own per-symbol number -- holding + trading, settle-marked,
+    the exact contribution those contracts make to live_gross.  Used for
+    contracts the bridge cannot price any other way (see reconcile's off-book
+    term); tolerant of the two CZCE year-digit forms.
+    """
+    df = daily_pnl(day)
+    if df is None or not tickers:
+        return 0.0, 0
+    want = set(tickers)
+    for t in tickers:
+        alt = names.alt_ticker(t)
+        if alt:
+            want.add(alt)
+    hit = df[df["symbol"].astype(str).isin(want)]
+    if not len(hit):
+        return 0.0, 0
+    return float(pd.to_numeric(hit["total_pnl"], errors="coerce").fillna(0.0).sum()), int(len(hit))
+
+
 def state(day: str) -> dict | None:
     """pnl/state_<D>.json parsed, or None."""
     p = C.PNL_DIR / f"state_{compact(day)}.json"
@@ -202,10 +224,9 @@ def snap_price_sets(day: str) -> list[tuple]:
             for human, px in (raw.get("prices") or {}).items():
                 if not px or px <= 0:
                     continue
-                try:
-                    prices[names.preferred_ticker(human)] = float(px)
-                except ValueError:
-                    continue
+                t = names.resolve(human)
+                if t is not None:
+                    prices[t] = float(px)
             if prices:
                 sets.append((ts, prices))
     fp = C.INBOX / "fundamental" / "meta" / f"positions_{normalize_date(day)}.json"
@@ -286,9 +307,8 @@ def book(source: str, day: str) -> dict[str, float] | None:
         raw = json.load(fh)
     out: dict[str, float] = {}
     for human, lots in raw.items():
-        try:
-            t = names.preferred_ticker(human)
-        except ValueError:
+        t = names.resolve(human)
+        if t is None:
             continue
         out[t] = out.get(t, 0.0) + float(lots)
     return out
@@ -330,10 +350,9 @@ def snap_prices(day: str, snap: str, source: str = "ks") -> dict[str, float] | N
     for human, px in (raw.get("prices") or {}).items():
         if not px or px <= 0:
             continue
-        try:
-            out[names.preferred_ticker(human)] = float(px)
-        except ValueError:
-            continue
+        t = names.resolve(human)
+        if t is not None:
+            out[t] = float(px)
     return out
 
 
@@ -347,10 +366,9 @@ def fund_prices(day: str) -> dict[str, float]:
     for human, rec in raw.items():
         if not isinstance(rec, dict) or not rec.get("price"):
             continue
-        try:
-            out[names.preferred_ticker(human)] = float(rec["price"])
-        except ValueError:
-            continue
+        t = names.resolve(human)
+        if t is not None:
+            out[t] = float(rec["price"])
     return out
 
 
@@ -366,13 +384,26 @@ def bench_prices(day: str) -> dict[str, float]:
     with no decision price at all falls back to its settle downstream, which
     zeroes its marking term by construction.
     """
-    out: dict[str, float] = {}
+    return {t: px for t, (px, _) in bench_prices_with_snap(day).items()}
+
+
+def bench_prices_with_snap(day: str) -> dict[str, tuple[float, str]]:
+    """{ticker: (first decision price, snap label)} -- bench_prices plus WHICH
+    decision it came from.
+
+    The snap label is what makes a window mismatch visible: a backtest row
+    spans 0900 -> 0900, so a contract whose first decision of the day is the
+    0930 or 1330 snap is benchmarked late and carries its own straddle (the
+    CFFEX index legs have no 0900 price at all).  "fund" is the fundamental
+    sleeve's daily mark.
+    """
+    out: dict[str, tuple[float, str]] = {}
     for source in (C.FORWARD_SOURCE, "ks"):
         for snap in C.SNAP_PREFERENCE:
             for t, px in (snap_prices(day, snap, source=source) or {}).items():
-                out.setdefault(t, px)
+                out.setdefault(t, (px, snap))
     for t, px in fund_prices(day).items():
-        out.setdefault(t, px)
+        out.setdefault(t, (px, "fund"))
     return out
 
 

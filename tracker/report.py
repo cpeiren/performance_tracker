@@ -167,6 +167,8 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
           f"bookdiff {_f(last['bookdiff_carry'] + last['bookdiff_creation'])} "
           f"(carry {_f(last['bookdiff_carry'])}, new {_f(last['bookdiff_creation'])}) | "
           f"intraday {_f(last.get('intraday_unfilled', 0.0))} | "
+          f"offbook {_f(last.get('offbook_pnl', 0.0))} "
+          f"({int(last.get('n_offbook', 0) or 0)} contract(s)) | "
           f"residual {_f(last['resid'])} (live re-marked to first decision, "
           f"vs the previous backtest row)")
         a(f"  fees {_f(last['fees'])} | broker residual {_f(last['broker_resid'])} "
@@ -174,20 +176,23 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
         a("")
 
     if len(live):
-        if "intraday_unfilled" not in live.columns:
-            live = live.assign(intraday_unfilled=0.0)
+        for col in ("intraday_unfilled", "offbook_pnl"):
+            if col not in live.columns:
+                live = live.assign(**{col: 0.0})
         cum = live[["expected", "exec_cost", "marking", "bookdiff_carry",
-                    "bookdiff_creation", "intraday_unfilled", "resid",
-                    "live_gross", "fees", "broker_resid", "live_net"]].sum()
+                    "bookdiff_creation", "intraday_unfilled", "offbook_pnl",
+                    "resid", "live_gross", "fees", "broker_resid",
+                    "live_net"]].sum()
         a(f"## Cumulative bridge (live since {C.LIVE_START}, "
           f"{len(live)} reconciled days)")
-        a("| expected | -exec | +marking | +bookdiff | +intraday | +resid "
-          "| = live gross | -fees | +broker_resid | = live net |")
-        a("|---|---|---|---|---|---|---|---|---|---|")
+        a("| expected | -exec | +marking | +bookdiff | +intraday | +offbook "
+          "| +resid | = live gross | -fees | +broker_resid | = live net |")
+        a("|---|---|---|---|---|---|---|---|---|---|---|")
         a(f"| {_f(cum['expected'])} | {_f(-cum['exec_cost'])} | "
           f"{_f(cum['marking'])} | "
           f"{_f(cum['bookdiff_carry'] + cum['bookdiff_creation'])} | "
           f"{_f(cum['intraday_unfilled'])} | "
+          f"{_f(cum['offbook_pnl'])} | "
           f"{_f(cum['resid'])} | "
           f"{_f(cum['live_gross'])} | {_f(-cum['fees'])} | "
           f"{_f(cum['broker_resid'])} | {_f(cum['live_net'])} |")
@@ -274,6 +279,25 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
         a("")
 
     a("## Data health")
+    if len(live):
+        lr = live.iloc[-1]
+        held = float(lr.get("live_gross_notional", 0.0) or 0.0)
+        nb = float(lr.get("nobench_notional", 0.0) or 0.0)
+        late = float(lr.get("bench_late_notional", 0.0) or 0.0)
+        if held > 0:
+            a(f"decision-price coverage ({live.index[-1]}): "
+              f"{100 * (held - nb) / held:.0f}% of held notional benchmarked "
+              f"({int(lr.get('n_nobench', 0) or 0)} contract(s) unbenchmarked); "
+              f"{int(lr.get('n_bench_late', 0) or 0)} contract(s) "
+              f"({100 * late / held:.0f}%) first decided after the 0900 snap, "
+              f"so they straddle their own overnight leg")
+        n_ob = int(lr.get("n_offbook", 0) or 0)
+        if n_ob:
+            a(f"off-book contracts ({live.index[-1]}): {n_ob} held that no "
+              f"shipped book names -- {str(lr.get('offbook_tickers', '') or '')}"
+              f"; P&L {_f(lr.get('offbook_pnl', 0.0))} taken verbatim from the "
+              f"executor, kept out of marking/bookdiff/intraday and out of "
+              f"the residual")
     if len(scales):
         cur = scales.dropna(subset=["scale"]).iloc[-1] if len(
             scales.dropna(subset=["scale"])) else None
@@ -344,17 +368,20 @@ def _plot(path, live: pd.DataFrame, bt_series: dict[str, pd.DataFrame],
     # would silently reindex (to all-NaN) against the datetime x otherwise.
     intraday = (live["intraday_unfilled"] if "intraday_unfilled" in live.columns
                 else live["resid"] * 0.0)
+    offbook = (live["offbook_pnl"] if "offbook_pnl" in live.columns
+               else live["resid"] * 0.0)
     comp = {
         "-exec_cost": (-live["exec_cost"].cumsum()).values,
         "+marking": live["marking"].cumsum().values,
         "+bookdiff": (live["bookdiff_carry"] + live["bookdiff_creation"]).cumsum().values,
         "+intraday": intraday.cumsum().values,
+        "+offbook": offbook.cumsum().values,
         "+resid": live["resid"].cumsum().values,
         "-fees": (-live["fees"].cumsum()).values,
     }
     for (col, vals), colr in zip(comp.items(),
                                  ["#a33a2e", "#2f855a", "#805ad5", "#b83280",
-                                  "#9a6b1e", "#4a5568"]):
+                                  "#2c7a7b", "#9a6b1e", "#4a5568"]):
         ax.plot(x, vals, lw=1.4, label=col, color=colr)
     ax.axhline(0, color="black", lw=0.7)
     ax.set_ylabel("CNY (cum)")

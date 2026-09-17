@@ -122,6 +122,18 @@ RESID_REL = 0.5
 #: Ship payload considered stale after this many business days.
 SHIP_STALE_BDAYS = 3
 
+#: Minimum fraction of HELD notional that must carry a shipped decision price.
+#: Below this the marking term is not measuring the book: a held contract with
+#: no bench has its marking, creation and intraday terms zeroed by
+#: construction, so its P&L falls into the residual.  This is the check that
+#: was missing on 2026-09-17, when four CFFEX legs (18% of held notional) sat
+#: unbenchmarked for weeks because a stale name mirror mis-cased their ticker.
+BENCH_COVERAGE_MIN = 0.98
+
+#: An off-book contract (named by neither day's ideal book) is worth an alert
+#: once its verbatim P&L passes this, in CNY.
+OFFBOOK_ALERT_CNY = 5000.0
+
 #: Minimum fraction of traded notional that must carry a shipped decision
 #: price for slip_total to be treated as measuring the book.  Below this the
 #: slippage number is mostly spread-only "unbenchmarked" cost and the report
