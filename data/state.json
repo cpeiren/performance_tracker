@@ -1538,8 +1538,8 @@
     }
   },
   "last_run": {
-    "at": "2026-09-18T08:11:14+00:00",
-    "n_alerts": 15,
+    "at": "2026-09-18T15:06:26+00:00",
+    "n_alerts": 16,
     "reconciled_through": "2026-09-17"
   },
   "missing_live_days": [

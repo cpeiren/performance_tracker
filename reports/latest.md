@@ -5,35 +5,36 @@
 - WEIGHTS CHANGE on 2026-09-01: ks_ext: 0.0->0.25.
 - WEIGHTS CHANGE on 2026-09-02: stat_arb: 1.0->0.0.
 - WEIGHTS CHANGE on 2026-09-03: stat_arb: 0.0->1.0.
-- BT REVISED vs PINS: fund_v3 current history differs from pinned as-shipped values on 2 new live-window day(s) (max |diff| 22676 CNY, first 2026-09-14); the bridge keeps the pins.
 - MISSING LIVE DAY 2026-08-28: trading day with a backtest row but no daily_pnl/state file; excluded from the bridge, expected pnl held in the missing-day bucket.
 - SCALE 2026-08-28: no usable run record; previous scale carried forward.
 - SCALE CHANGE on 2026-08-27: now 0.2.
 - SCALE CHANGE on 2026-09-01: now 0.5.
 - SCALE CHANGE on 2026-09-09: now 1.
-- BACKTEST REVISED: agri_event -- 2 mature row(s) changed since last run (net +450 CNY, largest 2026-02-26 -16730 -> -16480; first 2026-02-26, last 2026-06-09). Regeneration upstream; baseline re-set.
 - SLIPPAGE 2026-09-18: 6 unbenchmarked leg(s), +35 CNY exec cost without a shipped decision price.
-- RESIDUAL 2026-08-27: -17482 CNY vs trailing median |resid| 1250, offset by neither neighbour (2026-08-26 +2944, 2026-08-31 -22890) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
-- RESIDUAL 2026-09-02: -36248 CNY vs trailing median |resid| 1884, offset by neither neighbour (2026-09-01 +20264, 2026-09-03 -44604) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
-- RESIDUAL 2026-09-03: -44604 CNY vs trailing median |resid| 2533, offset by neither neighbour (2026-09-02 -36248, 2026-09-04 -42074) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
+- RESIDUAL 2026-08-27: -17267 CNY vs trailing median |resid| 2062, offset by neither neighbour (2026-08-26 +3749, 2026-08-31 -17348) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
+- RESIDUAL 2026-08-31: -17348 CNY vs trailing median |resid| 2277, offset by neither neighbour (2026-08-27 -17267, 2026-09-01 -8190) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
+- RESIDUAL 2026-09-01: -8190 CNY vs trailing median |resid| 2492, offset by neither neighbour (2026-08-31 -17348, 2026-09-02 -30063) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
+- RESIDUAL 2026-09-02: -30063 CNY vs trailing median |resid| 3121, offset by neither neighbour (2026-09-01 -8190, 2026-09-03 -29049) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
+- RESIDUAL 2026-09-03: -29049 CNY vs trailing median |resid| 3941, offset by neither neighbour (2026-09-02 -30063, 2026-09-04 -5584) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
+- RESIDUAL 2026-09-16: -103509 CNY vs trailing median |resid| 22936, offset by neither neighbour (2026-09-15 -28634, 2026-09-17 +23811) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
 
-## Latest reconciled day (2026-09-17, forward regime)
-live gross -63,945 | expected (1 x bt -26,438) = -26,438 | gap -37,507
-  exec_cost +4,012 (slip +3,490, unbench +522) | marking -64,660 | bookdiff +0 (carry +0, new +0) | intraday +0 | offbook +0 (0 contract(s)) | residual +31,166 (live re-marked to first decision, vs the previous backtest row)
-  fees +953 | broker residual +0 -> live net +935,102
+## Latest reconciled day (2026-09-17, forward regime, settled)
+live gross -34,100 | expected (1 x bt -26,438) = -26,438 | gap -7,662
+  exec_cost +4,012 (slip +3,490, unbench +522) | marking -27,460 | bookdiff +0 (carry +0, new +0) | intraday +0 | offbook +0 (0 contract(s)) | residual +23,811 (live re-marked to first decision, vs the previous backtest row)
+  fees +953 | broker residual +10 -> live net -35,042
 
 ## Cumulative bridge (live since 2026-08-18, 22 reconciled days)
 | expected | -exec | +marking | +bookdiff | +intraday | +offbook | +resid | = live gross | -fees | +broker_resid | = live net |
 |---|---|---|---|---|---|---|---|---|---|---|
-| +301,407 | +7,325 | -21,845 | +87,105 | -2,108 | -50 | -198,654 | +173,180 | -20,164 | +3,040 | +2,156,056 |
+| +301,407 | +7,325 | +10,150 | +88,792 | -2,108 | -50 | -136,691 | +268,825 | -20,164 | +140 | +248,801 |
 missing live days excluded: 2026-08-28 (expected +4,849 held in bucket)
 
 ## Stats (daily CNY pnl)
 | window | days | total | sharpe | mdd | hit |
 |---|---|---|---|---|---|
-| live net live-to-date | 22 | +2,156,056 | 5.12 | -157,155 | 64% | (small sample)
-| live net last-20d | 20 | +2,155,639 | 5.39 | -157,155 | 65% | (small sample)
-| live net 2026-YTD | 22 | +2,156,056 | 5.12 | -157,155 | 64% | (small sample)
+| live net live-to-date | 22 | +248,801 | 3.31 | -113,801 | 59% | (small sample)
+| live net last-20d | 20 | +248,204 | 3.46 | -113,801 | 60% | (small sample)
+| live net 2026-YTD | 22 | +248,801 | 3.31 | -113,801 | 59% | (small sample)
 | bt scaled live-to-date | 22 | +301,407 | 3.86 | -132,136 | 73% | (small sample)
 | bt scaled last-20d | 20 | +300,163 | 4.03 | -132,136 | 70% | (small sample)
 | bt scaled 2026-YTD | 22 | +301,407 | 3.86 | -132,136 | 73% | (small sample)
@@ -78,37 +79,85 @@ ranked by |all-in| over the live window (all-in = drift + exec = the bridge's ex
 ## Per strategy
 | strategy | live? | bt 2026 pnl (full) | bt scaled+weighted (live window) | live attributed | note |
 |---|---|---|---|---|---|
-| Calendar main pool (branch) | yes | +621,315 | +6,529 | +185,823 | forward w=0.8 |
-| Fundamental factor | yes | +773,179 | +356,326 | +197,313 | forward w=2 |
-| Cross-product pairs | yes | +116,990 | +13,306 | -32,359 | forward w=1.5 |
-| Calendar extended pool | yes | +423,530 | +6,013 | +56,500 | forward w=0.25 |
-| Chemical fundamental | yes | +434,470 | +18,873 | -37,485 | forward w=1.5 |
-| Agriculture event-driven | yes | +80,705 | -53,283 | -10,039 | forward w=1 |
-| Factor-neutral stat arb | yes | +260,073 | -46,357 | -96,562 | forward w=1 |
-| shared bucket | - | - | - | -36,510 | legacy multi-holder / forward offsetting |
-| neither bucket (no target) | - | - | - | -53,500 | inherited/manual/rounding |
+| Calendar main pool (branch) | yes | +621,315 | +6,529 | +162,853 | forward w=0.8 |
+| Fundamental factor | yes | +773,179 | +356,326 | +246,384 | forward w=2 |
+| Cross-product pairs | yes | +116,990 | +13,306 | -23,222 | forward w=1.5 |
+| Calendar extended pool | yes | +423,530 | +6,013 | +57,362 | forward w=0.25 |
+| Chemical fundamental | yes | +434,470 | +18,873 | -6,484 | forward w=1.5 |
+| Agriculture event-driven | yes | +80,705 | -53,283 | -2,745 | forward w=1 |
+| Factor-neutral stat arb | yes | +260,073 | -46,357 | -68,078 | forward w=1 |
+| shared bucket | - | - | - | -43,565 | legacy multi-holder / forward offsetting |
+| neither bucket (no target) | - | - | - | -53,680 | inherited/manual/rounding |
 forward-day attribution is pro-rated by weighted full-size lots; legacy days remain exclusive-holder.
+
+## Live P&L by strategy, last 10 reconciled days (attributed gross CNY)
+| day | ks_branch | fund_v3 | china_pairs | ks_ext | chem_fund | agri_event | stat_arb | shared | neither | total |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-09-04 | -1,745 | -15,118 | -9,587 | +208 | -7,639 | +516 | -1,020 | +7,025 | -1,300 | -28,660 |
+| 2026-09-07 | +11,861 | +12,714 | +1,573 | +4,602 | -4,325 | -1,735 | -2,445 | +2,800 | -760 | +24,285 |
+| 2026-09-08 | +31,797 | +12,901 | +1,167 | +4,299 | +7,680 | +2,967 | -5,805 | +3,850 | -2,950 | +55,905 |
+| 2026-09-09 | +10,781 | -15,894 | -7,210 | +2,903 | -5,759 | +1,364 | -3,664 | +2,735 | -3,380 | -18,125 |
+| 2026-09-10 | +8,153 | -2,745 | -5,986 | +12,583 | +26,171 | -8,482 | +14,125 | -4,810 | +0 | +39,010 |
+| 2026-09-11 | +25,179 | +108,588 | +12,217 | +64,705 | +13,268 | -1,343 | -14,799 | +925 | +0 | +208,740 |
+| 2026-09-14 | +79,654 | -34,357 | -16,641 | +8,446 | -6,594 | +2,408 | -11,405 | -29,965 | -6,400 | -14,855 |
+| 2026-09-15 | -42,941 | +39,447 | -2,310 | -77,028 | -12,853 | +1,020 | -2,841 | +12,925 | -7,200 | -91,780 |
+| 2026-09-16 | +29,645 | +34,877 | +2,266 | +28,070 | +7,170 | -3,416 | -26,475 | -5,640 | -31,640 | +34,855 |
+| 2026-09-17 | -28,037 | +25,676 | +7,972 | +8,207 | -21,232 | -2,113 | -16,383 | -10,205 | +2,015 | -34,100 |
+| sum | +124,346 | +166,089 | -16,539 | +56,994 | -4,114 | -8,814 | -70,712 | -20,360 | -51,615 | +175,275 |
+forward days pro-rate each contract's live P&L by weighted full-size lots; total foots to live gross. Live-window sums: 'Per strategy' above; full series: data/per_strategy_daily.csv (attributed)
 
 ## Per strategy gap by day, last 10 reconciled days (live attributed - expected, CNY)
 | day | ks_branch | fund_v3 | china_pairs | ks_ext | chem_fund | agri_event | stat_arb | total |
 |---|---|---|---|---|---|---|---|---|
-| 2026-09-04 | +6,112 | +10,838 | -9,893 | -2,761 | -6,843 | +1,891 | -4,736 | -5,392 |
-| 2026-09-07 | +10,211 | -174 | +8,457 | +6,362 | +11,696 | -6,594 | +3,412 | +33,369 |
-| 2026-09-08 | +17,829 | +7,803 | -10,431 | +7,963 | +2,092 | +614 | -5,188 | +20,682 |
-| 2026-09-09 | +4,589 | -21,778 | +10,382 | +5,155 | -152 | +3,603 | -11,751 | -9,953 |
-| 2026-09-10 | +22,549 | -3,716 | +1,547 | +14,549 | +14,353 | -8,820 | +13,400 | +53,863 |
-| 2026-09-11 | +17,230 | -147,014 | -10,236 | +61,128 | +2,398 | +6,123 | -11,105 | -81,477 |
-| 2026-09-14 | +83,414 | +3,777 | -11,197 | +8,256 | -43,055 | +18,346 | -15,854 | +43,686 |
-| 2026-09-15 | -2,273 | +15,986 | +1,254 | -82,964 | +4,900 | +10,234 | +2,813 | -50,049 |
-| 2026-09-16 | +7,705 | +11,573 | +15,970 | +17,770 | +8,146 | +14,414 | -8,983 | +66,596 |
-| 2026-09-17 | +5,732 | +6,453 | -8,861 | +12,110 | -25,396 | -1,783 | -14,491 | -26,237 |
-| sum | +173,097 | -116,251 | -13,009 | +47,569 | -31,861 | +38,027 | -52,483 | +45,090 |
+| 2026-09-04 | -3,117 | +5,305 | -9,831 | -2,502 | -5,183 | -14 | -420 | -15,762 |
+| 2026-09-07 | +14,497 | -13,469 | +5,034 | +4,389 | +5,238 | -5,895 | +5,696 | +15,489 |
+| 2026-09-08 | +17,805 | -8,077 | -5,553 | +6,538 | -1,317 | -623 | -2,646 | +6,127 |
+| 2026-09-09 | -7,595 | -33,341 | +11,030 | +264 | -4,004 | +264 | -11,081 | -44,463 |
+| 2026-09-10 | +23,009 | -15,227 | -6,098 | +8,543 | +17,433 | -3,382 | +6,600 | +30,878 |
+| 2026-09-11 | +29,683 | -84,428 | -16 | +65,014 | +9,555 | +5,657 | -12,742 | +12,723 |
+| 2026-09-14 | +88,782 | +4,357 | -3,914 | +12,671 | -30,819 | +21,428 | -10,504 | +82,001 |
+| 2026-09-15 | -6,961 | +21,190 | +2,625 | -77,908 | -58 | +13,975 | +6,862 | -40,274 |
+| 2026-09-16 | +6,605 | +6,290 | +8,956 | +16,578 | +10,627 | +11,524 | -469 | +60,111 |
+| 2026-09-17 | -19,361 | +27,766 | -2,820 | +14,258 | -13,185 | +1,927 | -8,057 | +528 |
+| sum | +143,346 | -89,634 | -587 | +47,846 | -11,711 | +44,861 | -26,760 | +107,360 |
 full series: data/per_strategy_daily.csv (day, strategy, expected, attributed, gap); a strategy's daily total foots to expected - live_gross once the shared and neither buckets are added.
+
+## Live P&L by product, last 10 reconciled days (gross CNY, worst first)
+| product | 09-04 | 09-07 | 09-08 | 09-09 | 09-10 | 09-11 | 09-14 | 09-15 | 09-16 | 09-17 | 10d sum | live window |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| bu | -950 | -2,750 | -1,280 | -1,300 | -4,020 | -10,100 | -24,440 | -34,350 | -13,360 | -16,680 | -109,230 | -117,270 |
+| hc | +9,930 | -2,150 | +2,690 | +1,920 | -24,030 | -38,740 | -36,660 | +830 | +7,090 | +8,640 | -70,480 | -87,040 |
+| CF | -2,050 | +150 | +975 | -100 | -6,425 | -7,900 | -8,575 | -18,450 | -8,225 | -10,050 | -60,650 | -61,225 |
+| pp | -4,245 | +2,595 | -680 | +1,015 | -28,720 | +510 | -2,050 | -1,960 | +1,570 | -9,930 | -41,895 | -42,330 |
+| p | -1,330 | +6,760 | +12,900 | -4,880 | -15,310 | +5,330 | -16,810 | -11,090 | +890 | -970 | -24,510 | -11,880 |
+| c | +1,230 | -1,280 | +790 | -2,120 | -6,040 | -2,600 | -4,020 | -5,120 | -1,050 | -1,580 | -21,790 | -19,310 |
+| lh | +560 | -480 | +640 | -1,920 | -4,800 | -2,880 | -1,440 | -8,640 | +1,440 | -320 | -17,840 | -18,240 |
+| y | +850 | +1,420 | +10,620 | -8,520 | -14,550 | +6,760 | -11,240 | -7,760 | +6,560 | -1,160 | -17,020 | -15,070 |
+| ni | -670 | +80 | -1,470 | +2,060 | +2,670 | -6,360 | -2,380 | -3,380 | -6,960 | +970 | -15,440 | -16,500 |
+| IF | -240 | -480 | +3,180 | +6,240 | +8,460 | +15,480 | +6,480 | -65,940 | +6,540 | +6,300 | -13,980 | -12,540 |
+| ss | -300 | +850 | -1,000 | -375 | +1,625 | -15,600 | -4,250 | +400 | -2,750 | +8,500 | -12,900 | -12,600 |
+| br | +0 | +500 | -700 | -2,025 | -2,250 | -200 | +350 | -650 | -850 | -2,400 | -8,225 | -8,275 |
+| j | +0 | +0 | +0 | +950 | -3,550 | -3,400 | -4,000 | -700 | +1,550 | +1,150 | -8,000 | -8,000 |
+| SH | +1,290 | +1,890 | -120 | -30 | +120 | -120 | -5,400 | -1,050 | -1,890 | +420 | -4,890 | -6,120 |
+| MA | +180 | +940 | +1,160 | -2,460 | +5,960 | +3,480 | -3,200 | -4,610 | -6,170 | +690 | -4,030 | -4,200 |
+| other (23) | +8,455 | +9,570 | +22,370 | -9,015 | +35,385 | +51,020 | -9,795 | +9,870 | +19,755 | -815 | +136,800 | +201,430 |
+| l | +860 | -2,730 | +4,915 | +1,275 | +27,585 | +3,050 | -200 | -10,735 | +5,445 | -9,270 | +20,195 | +38,040 |
+| SF | -20,880 | +13,280 | +6,400 | +6,800 | +4,620 | +10,770 | -500 | +2,350 | +820 | -990 | +22,670 | +9,490 |
+| pg | -1,300 | +680 | +4,500 | +760 | +11,760 | +6,600 | +4,720 | +1,640 | +6,300 | -10,180 | +25,480 | +34,700 |
+| TA | -3,940 | -2,260 | +4,540 | +4,050 | +10,360 | +4,850 | +9,200 | +5,310 | +3,020 | -4,680 | +30,450 | +36,190 |
+| fu | +330 | +600 | +190 | +730 | -600 | +15,360 | +5,450 | +14,310 | +7,620 | -3,700 | +40,290 | +35,420 |
+| CY | +100 | -2,325 | +1,100 | +475 | -1,150 | -1,450 | +8,500 | +17,600 | +14,500 | +4,575 | +41,925 | +42,625 |
+| IH | +180 | +960 | -1,440 | -1,140 | +4,320 | +43,860 | +300 | -12,300 | +11,700 | -1,500 | +44,940 | +43,140 |
+| zn | -4,850 | -10,775 | -16,575 | -5,225 | -15,000 | +68,550 | +21,625 | +22,525 | -3,600 | +1,750 | +58,425 | +63,550 |
+| rb | -11,740 | -400 | -2,870 | -3,050 | +24,800 | +43,910 | +31,050 | +1,260 | -10,520 | -3,390 | +69,050 | +92,880 |
+| cs | -130 | +9,640 | +5,070 | -2,240 | +27,790 | +18,560 | +32,430 | +18,860 | -4,570 | +10,520 | +115,930 | +111,960 |
+| all products | -28,660 | +24,285 | +55,905 | -18,125 | +39,010 | +208,740 | -14,855 | -91,780 | +34,855 | -34,100 | +175,275 | +268,825 |
+executor total_pnl (holding + trading, settlement-to-settlement once the next capture lands, before fees) summed by product root; 'all products' foots to live gross. Full series: data/product_daily.csv
 
 ## Data health
 decision-price coverage (2026-09-17): 100% of held notional benchmarked (1 contract(s) unbenchmarked); 9 contract(s) (19%) first decided after the 0900 snap, so they straddle their own overnight leg
 scale: 1 (since 2026-09-09)
 regime: forward (merged weighted book) since 2026-08-31; 14 forward day(s), 8 legacy day(s)
 merge weights (2026-09-18): ks_branch 0.8, fund_v3 2, china_pairs 1.5, ks_ext 0.25, chem_fund 1.5, agri_event 1, stat_arb 1
-as-shipped pins: 23 live day(s) pinned; current series diverges from pins on fund_v3: 21 day(s), max 22,676 CNY, 2 NEW, ks_branch: 20 day(s), max 33,735 CNY, ks_ext: 19 day(s), max 42,170 CNY, stat_arb: 14 day(s), max 10,719 CNY, china_pairs: 17 day(s), max 2,120 CNY, agri_event: 5 day(s), max 5,680 CNY, chem_fund: 1 day(s), max 20 CNY; standing counts -- a divergence is announced as an alert once, the first run it appears, and kept here afterwards
+as-shipped pins: 23 live day(s) pinned; current series diverges from pins on fund_v3: 21 day(s), max 22,676 CNY, ks_branch: 20 day(s), max 33,735 CNY, ks_ext: 19 day(s), max 42,170 CNY, stat_arb: 14 day(s), max 10,719 CNY, china_pairs: 17 day(s), max 2,120 CNY, agri_event: 5 day(s), max 5,680 CNY, chem_fund: 1 day(s), max 20 CNY; standing counts -- a divergence is announced as an alert once, the first run it appears, and kept here afterwards
 inbox ks summary mtime: 2026-09-18 05:53 UTC
