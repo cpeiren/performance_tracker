@@ -63,6 +63,58 @@ def per_strategy_daily(live: pd.DataFrame, bt_bridge: pd.DataFrame | None,
     return pd.DataFrame(rows, columns=["day", "strategy", "expected", "attributed", "gap"])
 
 
+def _day_table(a, wide: pd.DataFrame, cols: list[str]) -> None:
+    """Rows = days, columns = `cols`, plus a row total and a sum row."""
+    a("| day | " + " | ".join(cols) + " | total |")
+    a("|---|" + "---|" * (len(cols) + 1))
+    for day, row in wide.iterrows():
+        a(f"| {day} | " + " | ".join(_f(row[c]) for c in cols)
+          + f" | {_f(row[cols].sum())} |")
+    a("| sum | " + " | ".join(_f(wide[c].sum()) for c in cols)
+      + f" | {_f(wide[cols].sum().sum())} |")
+
+
+def _product_section(a, days: list[str], n_days: int = 10,
+                     n_worst: int = 15, n_best: int = 10) -> None:
+    """Live gross P&L by product root: the last `n_days` as columns, ranked
+    by their sum (worst first), so a bleeding product is one read.  The full
+    per-day series goes to data/product_daily.csv."""
+    pp = io_live.product_daily_pnl(days)
+    if not len(pp):
+        return
+    pp.to_csv(C.DATA / "product_daily.csv", index=False)
+    wide = pp.pivot(index="product", columns="day", values="total_pnl").fillna(0.0)
+    tail_days = sorted(wide.columns)[-n_days:]
+    t = wide[tail_days].copy()
+    t["sum"] = t.sum(axis=1)
+    t["window"] = wide.sum(axis=1)
+    t = t.sort_values("sum")
+    show = pd.concat([t.head(n_worst), t.iloc[n_worst:].tail(n_best)])
+    rest = t.drop(show.index)
+    cols = tail_days + ["sum", "window"]
+
+    a(f"## Live P&L by product, last {len(tail_days)} reconciled days "
+      "(gross CNY, worst first)")
+    a("| product | " + " | ".join(d[5:] for d in tail_days)
+      + f" | {len(tail_days)}d sum | live window |")
+    a("|---|" + "---|" * len(cols))
+
+    def prow(label, r):
+        a(f"| {label} | " + " | ".join(_f(r[c]) for c in cols) + " |")
+
+    for prod, r in show.iloc[:n_worst].iterrows():
+        prow(prod, r)
+    if len(rest):
+        prow(f"other ({len(rest)})", rest.sum())
+    for prod, r in show.iloc[n_worst:].iterrows():
+        prow(prod, r)
+    prow("all products", t.sum())
+    a("executor total_pnl (holding + trading, settle-marked, before fees) "
+      "summed by product root; 'all products' foots to live gross. "
+      "Full series: data/product_daily.csv")
+    a("")
+
+
 def _slippage_section(a, day: str, n_days: int = 10) -> None:
     """Execution cost from pyexec's analysis files (the exec_cost source):
     daily bps with the drift/exec split, the live-window total, and the
@@ -257,26 +309,37 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
     # Per-strategy per-DAY gaps, so a sleeve's shortfall can be judged on its
     # trailing distribution (the table above only sums the window). The full
     # long-format series goes to data/per_strategy_daily.csv.
+    n_tail = 10
+    if len(attribution):
+        att = attribution.loc[attribution.index.isin(live.index)].fillna(0.0)
+        cols = [k for k in C.STRATEGIES if k in att.columns] + [
+            b for b in ("shared", "neither") if b in att.columns]
+        tail = att[cols].tail(n_tail)
+        a(f"## Live P&L by strategy, last {len(tail)} reconciled days "
+          "(attributed gross CNY)")
+        _day_table(a, tail, cols)
+        a("forward days pro-rate each contract's live P&L by weighted "
+          "full-size lots; total foots to live gross. Live-window sums: "
+          "'Per strategy' above; full series: data/per_strategy_daily.csv "
+          "(attributed)")
+        a("")
+
     psd = per_strategy_daily(live, bt_bridge, attribution)
     if len(psd):
         psd.to_csv(C.DATA / "per_strategy_daily.csv", index=False)
-        n_tail = 10
         gap = psd.pivot(index="day", columns="strategy", values="gap").fillna(0.0)
         cols = [k for k in C.STRATEGIES if k in gap.columns]
         tail = gap[cols].tail(n_tail)
         a(f"## Per strategy gap by day, last {len(tail)} reconciled days "
           "(live attributed - expected, CNY)")
-        a("| day | " + " | ".join(cols) + " | total |")
-        a("|---|" + "---|" * (len(cols) + 1))
-        for day, row in tail.iterrows():
-            a(f"| {day} | " + " | ".join(_f(row[c]) for c in cols)
-              + f" | {_f(row[cols].sum())} |")
-        a(f"| sum | " + " | ".join(_f(tail[c].sum()) for c in cols)
-          + f" | {_f(tail[cols].sum().sum())} |")
+        _day_table(a, tail, cols)
         a("full series: data/per_strategy_daily.csv (day, strategy, expected, "
           "attributed, gap); a strategy's daily total foots to expected - "
           "live_gross once the shared and neither buckets are added.")
         a("")
+
+    if len(live):
+        _product_section(a, list(live.index), n_days=n_tail)
 
     a("## Data health")
     if len(live):

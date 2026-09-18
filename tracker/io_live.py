@@ -58,6 +58,30 @@ def daily_pnl(day: str) -> pd.DataFrame | None:
     return df[~df["symbol"].astype(str).str.startswith("_")].reset_index(drop=True)
 
 
+def product_daily_pnl(days) -> pd.DataFrame:
+    """Executor per-symbol P&L rolled up to product root, long format.
+
+    Columns: day, product, holding_pnl, trading_pnl, total_pnl (gross, fees
+    are account-level only).  Sums to the day's per-symbol total, i.e. the
+    same total the attribution buckets split.  Days without a file are
+    skipped.
+    """
+    cols = ["holding_pnl", "trading_pnl", "total_pnl"]
+    frames = []
+    for d in days:
+        df = daily_pnl(d)
+        if df is None or not len(df):
+            continue
+        g = df.assign(product=df["symbol"].astype(str).map(names.product_root))
+        g[cols] = g[cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
+        g = g.groupby("product", as_index=False)[cols].sum()
+        g.insert(0, "day", normalize_date(d))
+        frames.append(g)
+    if not frames:
+        return pd.DataFrame(columns=["day", "product"] + cols)
+    return pd.concat(frames, ignore_index=True)
+
+
 def symbol_pnl(day: str, tickers) -> tuple[float, int]:
     """(summed gross total_pnl, n symbols matched) for `tickers` on one day.
 
