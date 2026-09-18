@@ -109,8 +109,9 @@ def _product_section(a, days: list[str], n_days: int = 10,
     for prod, r in show.iloc[n_worst:].iterrows():
         prow(prod, r)
     prow("all products", t.sum())
-    a("executor total_pnl (holding + trading, settle-marked, before fees) "
-      "summed by product root; 'all products' foots to live gross. "
+    a("executor total_pnl (holding + trading, settlement-to-settlement once "
+      "the next capture lands, before fees) summed by product root; 'all "
+      "products' foots to live gross. "
       "Full series: data/product_daily.csv")
     a("")
 
@@ -210,7 +211,10 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
     if last is not None:
         d = live.index[-1]
         regime = last.get("regime", "legacy") if hasattr(last, "get") else "legacy"
-        a(f"## Latest reconciled day ({d}, {regime} regime)")
+        status = ("settled" if bool(last.get("pnl_final", True))
+                  else "PROVISIONAL: marked at the 16:00 close, re-marked to "
+                       "settlement after the next capture")
+        a(f"## Latest reconciled day ({d}, {regime} regime, {status})")
         a(f"live gross {_f(last['live_gross'])} | expected "
           f"({last['scale']:g} x bt {_f(last['bt_gross_fullsize'])}) = "
           f"{_f(last['expected'])} | gap {_f(last['live_gross'] - last['expected'])}")

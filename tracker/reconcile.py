@@ -40,10 +40,14 @@ Per trading day D and contract c with multiplier m_c:
                    + resid_D                                          (exact)
     live_net_D   = live_gross_D - fees_D + broker_resid_D
 
-live_gross_D is pyexec's settle-marked sum (holding + trading per contract,
-== the broker's CloseProfit + PositionProfit); live_net_D is the account
-equity delta against the counter's PreBalance, so broker_resid_D is ~0
-since pyexec F124 (2026-09-03).
+live_gross_D is pyexec's per-contract sum (holding + trading, == the
+broker's CloseProfit + PositionProfit) completed to SETTLEMENT-TO-SETTLEMENT
+once the next capture publishes D's settlement (io_live.account_pnl; the
+16:00 capture alone is settle(D-1) -> close(D)).  settle_c(D) is the same
+official settlement (io_live.day_settles), so every term is on one mark.
+live_net_D is pyexec's final_pnl (cash flows excluded); broker_resid_D is
+what the positions do not explain, ~0 since pyexec F124 (2026-09-03).  The
+latest day stays close-marked (pnl_final False) until the next capture.
 
 Why these terms: exec_cost prices fills away from the shipped decision
 (positive = paid); the telescoping marking term absorbs the settle-vs-snap
@@ -127,14 +131,14 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
     st_prev = io_live.state(prev_day) if prev_day else None
 
     live_pos = io_live.live_positions(st)
-    settle = io_live.settles(st)
+    settle = io_live.day_settles(day)
     mult = _multipliers(st)
     bench = io_live.bench_prices(day)
 
     full = io_live.fullsize_book_for_bridge(day, forward)
 
     prev_pos = io_live.live_positions(st_prev) if st_prev else {}
-    prev_settle = io_live.settles(st_prev) if st_prev else {}
+    prev_settle = io_live.day_settles(prev_day) if st_prev else {}
     prev_mult = _multipliers(st_prev) if st_prev else {}
     prev_full = (io_live.fullsize_book_for_bridge(prev_day, prev_forward)
                  if prev_day else {})
@@ -244,11 +248,9 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
     summ = io_live.daily_summary()
     if day not in summ.index:
         return None
-    row = summ.loc[day]
-    live_gross = float(row["gross"])
-    fees = float(row["fees"])
-    broker_resid = float(row.get("residual", 0.0) or 0.0)
-    live_net = float(row["aggregate"])
+    acct = io_live.account_pnl(summ.loc[day])
+    live_gross, fees = acct["live_gross"], acct["fees"]
+    broker_resid, live_net = acct["broker_resid"], acct["live_net"]
 
     ex = io_live.exec_summary()
     slip_total = float(ex.loc[day, "slip_total"]) if day in ex.index else 0.0
@@ -288,6 +290,7 @@ def bridge_day(day: str, prev_day: str | None, scale: float,
         "fees": fees,
         "broker_resid": broker_resid,
         "live_net": live_net,
+        "pnl_final": acct["final"],
         "n_live_contracts": sum(1 for v in live_pos.values() if v[0] != 0),
         "n_nobench": n_nobench,
         "nobench_notional": nobench_notional,

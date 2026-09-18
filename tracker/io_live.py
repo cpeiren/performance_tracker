@@ -42,6 +42,69 @@ def daily_summary() -> pd.DataFrame:
     return df.drop_duplicates("date", keep="last").set_index("date").sort_index()
 
 
+def is_final(row) -> bool:
+    """A daily_summary row whose settle-to-settle columns are filled (F134)."""
+    return (str(row.get("final_status", "") or "").startswith("final")
+            and not pd.isna(row.get("final_pnl")))
+
+
+def account_pnl(row) -> dict:
+    """Account-level gross / fees / net for one daily_summary row.
+
+    pyexec captures at 16:00, before settlement (F134): ``gross`` runs from
+    yesterday's SETTLEMENT to today's CLOSE, and ``aggregate`` is a raw
+    balance delta that includes deposits.  Once the next capture lands the
+    row is final and ``settle_implied`` (this day's positions x (settlement -
+    close) x mult) completes it to settlement-to-settlement; ``final_pnl`` is
+    the net of that, cash flows excluded.  Until 2026-09-18 the tracker used
+    gross + aggregate: every day's close->settlement move was booked in no
+    day (09-17: -63,945 read vs -34,100 settled) and the two 1,000,000
+    deposits sat in live net.  A provisional day stays close-marked.
+    """
+    gross, fees = float(row["gross"]), float(row["fees"])
+    cash = float(row.get("deposit", 0.0) or 0.0) - float(row.get("withdraw", 0.0) or 0.0)
+    if is_final(row):
+        g = gross + float(row.get("settle_implied", 0.0) or 0.0)
+        net = float(row["final_pnl"])
+    else:
+        g, net = gross, float(row["aggregate"]) - cash
+    return {"live_gross": g, "fees": fees, "live_net": net,
+            "broker_resid": net - (g - fees), "final": is_final(row)}
+
+
+def _next_state(day: str) -> dict | None:
+    """The first state capture AFTER ``day`` (whose pre_settle is day's
+    official settlement), or None while ``day`` is the latest capture."""
+    key = compact(day)
+    later = sorted(p.stem[len("state_"):] for p in C.PNL_DIR.glob("state_*.json")
+                   if p.stem[len("state_"):] > key)
+    return state(later[0]) if later else None
+
+
+def final_settles(day: str) -> dict[str, float]:
+    """{ticker: official settlement of ``day``} from the next capture's
+    pre_settle; empty while the day is provisional."""
+    nxt = _next_state(day)
+    if nxt is None:
+        return {}
+    out = {}
+    for block in ("marks", "positions"):
+        for sym, v in (nxt.get(block) or {}).items():
+            if sym not in out and v.get("pre_settle") is not None:
+                out[sym] = float(v["pre_settle"])
+    return out
+
+
+def day_settles(day: str) -> dict[str, float]:
+    """End-of-day marks for ``day``: official settlement where known, the
+    16:00 close mark otherwise (provisional day, or a contract the next
+    capture does not carry)."""
+    st = state(day)
+    out = settles(st) if st else {}
+    out.update({t: v for t, v in final_settles(day).items() if t in out})
+    return out
+
+
 def daily_pnl(day: str) -> pd.DataFrame | None:
     """Per-symbol daily P&L for one day, sentinel rows removed. None if missing.
 
@@ -50,30 +113,49 @@ def daily_pnl(day: str) -> pd.DataFrame | None:
     2026-09-03 only two names were listed, so the per-symbol sum came out as
     2*gross - fees and leaked into the residual, a phantom "broker basis"
     term and the no-target attribution bucket.
+
+    ``total_pnl`` is returned SETTLEMENT-TO-SETTLEMENT: pyexec's file stops
+    at the close, so ``settle_adj`` = net_now x (settlement - close) x mult
+    is added once the next capture publishes the settlement (see
+    account_pnl); the file's own number is kept as ``total_pnl_close``.
     """
     p = C.PNL_DIR / f"daily_pnl_{compact(day)}.csv"
     if not p.exists():
         return None
     df = pd.read_csv(p)
-    return df[~df["symbol"].astype(str).str.startswith("_")].reset_index(drop=True)
+    df = df[~df["symbol"].astype(str).str.startswith("_")].reset_index(drop=True)
+    for c in ("net_now", "settle_now", "total_pnl"):
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
+    fin = final_settles(day)
+    st = state(day) or {}
+    mult = {s: float(p.get("multiplier") or 0.0)
+            for s, p in (st.get("positions") or {}).items()}
+    df["settle_adj"] = [
+        n * (lookup(fin, s) - c) * (lookup(mult, s) or 0.0)
+        if n and lookup(fin, s) is not None else 0.0
+        for s, n, c in zip(df["symbol"].astype(str), df["net_now"], df["settle_now"])]
+    df["total_pnl_close"] = df["total_pnl"]
+    df["total_pnl"] = df["total_pnl"] + df["settle_adj"]
+    return df
 
 
 def product_daily_pnl(days) -> pd.DataFrame:
     """Executor per-symbol P&L rolled up to product root, long format.
 
     Columns: day, product, holding_pnl, trading_pnl, total_pnl (gross, fees
-    are account-level only).  Sums to the day's per-symbol total, i.e. the
+    are account-level only; settlement-to-settlement once final, see
+    daily_pnl).  Sums to the day's per-symbol total, i.e. the
     same total the attribution buckets split.  Days without a file are
     skipped.
     """
-    cols = ["holding_pnl", "trading_pnl", "total_pnl"]
+    cols = ["holding_pnl", "trading_pnl", "settle_adj", "total_pnl"]
     frames = []
     for d in days:
         df = daily_pnl(d)
         if df is None or not len(df):
             continue
         g = df.assign(product=df["symbol"].astype(str).map(names.product_root))
-        g[cols] = g[cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
+        g[cols] = g.reindex(columns=cols).apply(pd.to_numeric, errors="coerce").fillna(0.0)
         g = g.groupby("product", as_index=False)[cols].sum()
         g.insert(0, "day", normalize_date(d))
         frames.append(g)
