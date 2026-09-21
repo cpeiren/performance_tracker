@@ -303,11 +303,13 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
           f"{attributed} | {note} |")
     if len(attribution):
         a(f"| shared bucket | - | - | - | "
-          f"{_f(attribution['shared'].sum())} | legacy multi-holder / forward offsetting |")
+          f"{_f(attribution['shared'].sum())} | legacy multi-holder / forward offsetting (split refused, not a cost) |")
         a(f"| neither bucket (no target) | - | - | - | "
-          f"{_f(attribution['neither'].sum())} | inherited/manual/rounding |")
+          f"{_f(attribution['neither'].sum())} | named by no book that day or the day before |")
         a("forward-day attribution is pro-rated by weighted full-size lots; "
-          "legacy days remain exclusive-holder.")
+          "legacy days remain exclusive-holder. A contract the day's own "
+          "books do not name resolves against the previous same-regime day, "
+          "so a roll-out's exit P&L is charged to whoever held it.")
     a("")
 
     # Per-strategy per-DAY gaps, so a sleeve's shortfall can be judged on its
