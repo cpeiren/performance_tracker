@@ -10,7 +10,6 @@
 - SCALE CHANGE on 2026-08-27: now 0.2.
 - SCALE CHANGE on 2026-09-01: now 0.5.
 - SCALE CHANGE on 2026-09-09: now 1.
-- BACKTEST REVISED: agri_event -- 2 mature row(s) changed since last run (net +600 CNY, largest 2026-02-25 +9055 -> +9705; first 2026-02-25, last 2026-03-09). Regeneration upstream; baseline re-set.
 - SLIPPAGE 2026-09-21: 4 unbenchmarked leg(s), +750 CNY exec cost without a shipped decision price.
 - RESIDUAL 2026-08-27: -17267 CNY vs trailing median |resid| 2062, offset by neither neighbour (2026-08-26 +3749, 2026-08-31 -17348) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
 - RESIDUAL 2026-08-31: -17348 CNY vs trailing median |resid| 2277, offset by neither neighbour (2026-08-27 -17267, 2026-09-01 -8190) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
@@ -80,47 +79,47 @@ ranked by |all-in| over the live window (all-in = drift + exec = the bridge's ex
 ## Per strategy
 | strategy | live? | bt 2026 pnl (full) | bt scaled+weighted (live window) | live attributed | note |
 |---|---|---|---|---|---|
-| Calendar main pool (branch) | yes | +561,990 | +15,777 | +148,569 | forward w=0.8 |
-| Fundamental factor | yes | +760,598 | +280,637 | +185,424 | forward w=2 |
-| Cross-product pairs | yes | +111,345 | +19,163 | -13,512 | forward w=1.5 |
-| Calendar extended pool | yes | +358,965 | +1,897 | +40,128 | forward w=0.25 |
-| Chemical fundamental | yes | +420,300 | +20,598 | -32,487 | forward w=1.5 |
+| Calendar main pool (branch) | yes | +561,990 | +15,777 | +135,164 | forward w=0.8 |
+| Fundamental factor | yes | +760,598 | +280,637 | +152,849 | forward w=2 |
+| Cross-product pairs | yes | +111,345 | +19,163 | -16,949 | forward w=1.5 |
+| Calendar extended pool | yes | +358,965 | +1,897 | +52,590 | forward w=0.25 |
+| Chemical fundamental | yes | +420,300 | +20,598 | -33,007 | forward w=1.5 |
 | Agriculture event-driven | yes | +120,720 | -40,083 | -5,106 | forward w=1 |
-| Factor-neutral stat arb | yes | +249,494 | -56,936 | -79,001 | forward w=1 |
-| shared bucket | - | - | - | -33,230 | legacy multi-holder / forward offsetting |
-| neither bucket (no target) | - | - | - | -45,015 | inherited/manual/rounding |
-forward-day attribution is pro-rated by weighted full-size lots; legacy days remain exclusive-holder.
+| Factor-neutral stat arb | yes | +249,494 | -56,936 | -80,996 | forward w=1 |
+| shared bucket | - | - | - | -35,545 | legacy multi-holder / forward offsetting (split refused, not a cost) |
+| neither bucket (no target) | - | - | - | -3,230 | named by no book that day or the day before |
+forward-day attribution is pro-rated by weighted full-size lots; legacy days remain exclusive-holder. A contract the day's own books do not name resolves against the previous same-regime day, so a roll-out's exit P&L is charged to whoever held it.
 
 ## Live P&L by strategy, last 10 reconciled days (attributed gross CNY)
 | day | ks_branch | fund_v3 | china_pairs | ks_ext | chem_fund | agri_event | stat_arb | shared | neither | total |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 2026-09-07 | +11,861 | +12,714 | +1,573 | +4,602 | -4,325 | -1,735 | -2,445 | +2,800 | -760 | +24,285 |
-| 2026-09-08 | +31,797 | +12,901 | +1,167 | +4,299 | +7,680 | +2,967 | -5,805 | +3,850 | -2,950 | +55,905 |
-| 2026-09-09 | +10,781 | -15,894 | -7,210 | +2,903 | -5,759 | +1,364 | -3,664 | +2,735 | -3,380 | -18,125 |
+| 2026-09-07 | +11,861 | +12,714 | +1,573 | +4,535 | -4,325 | -1,735 | -3,138 | +2,800 | +0 | +24,285 |
+| 2026-09-08 | +33,217 | +9,824 | -107 | +4,299 | +7,680 | +2,967 | -5,824 | +3,850 | +0 | +55,905 |
+| 2026-09-09 | +10,781 | -15,894 | -7,210 | +2,903 | -9,139 | +1,364 | -3,664 | +2,735 | +0 | -18,125 |
 | 2026-09-10 | +8,153 | -2,745 | -5,986 | +12,583 | +26,171 | -8,482 | +14,125 | -4,810 | +0 | +39,010 |
 | 2026-09-11 | +25,179 | +108,588 | +12,217 | +64,705 | +13,268 | -1,343 | -14,799 | +925 | +0 | +208,740 |
-| 2026-09-14 | +79,654 | -34,357 | -16,641 | +8,446 | -6,594 | +2,408 | -11,405 | -29,965 | -6,400 | -14,855 |
-| 2026-09-15 | -42,941 | +39,447 | -2,310 | -77,028 | -12,853 | +1,020 | -2,841 | +12,925 | -7,200 | -91,780 |
-| 2026-09-16 | +29,645 | +34,877 | +2,266 | +28,070 | +7,170 | -3,416 | -26,475 | -5,640 | -31,640 | +34,855 |
-| 2026-09-17 | -28,037 | +25,676 | +7,972 | +8,207 | -21,232 | -2,113 | -16,383 | -10,205 | +2,015 | -34,100 |
-| 2026-09-18 | -14,283 | -60,960 | +9,710 | -17,234 | -26,003 | -2,361 | -10,923 | +10,335 | +8,665 | -103,055 |
-| sum | +111,808 | +120,247 | +2,757 | +39,552 | -22,478 | -11,691 | -80,616 | -17,050 | -41,650 | +100,880 |
+| 2026-09-14 | +79,654 | -36,097 | -16,641 | +8,446 | -7,254 | +2,408 | -15,405 | -29,965 | +0 | -14,855 |
+| 2026-09-15 | -42,941 | +30,807 | -2,310 | -75,588 | -12,853 | +1,020 | -2,841 | +12,925 | +0 | -91,780 |
+| 2026-09-16 | +3,527 | +33,527 | +2,266 | +25,850 | +7,170 | -3,416 | -28,428 | -5,640 | +0 | +34,855 |
+| 2026-09-17 | -20,273 | +17,342 | +8,734 | +8,207 | -17,932 | -2,113 | -18,535 | -9,530 | +0 | -34,100 |
+| 2026-09-18 | -12,017 | -66,793 | +9,710 | -4,925 | -26,003 | -2,361 | -11,001 | +10,335 | +0 | -103,055 |
+| sum | +97,141 | +91,274 | +2,245 | +51,015 | -23,218 | -11,691 | -89,511 | -16,375 | +0 | +100,880 |
 forward days pro-rate each contract's live P&L by weighted full-size lots; total foots to live gross. Live-window sums: 'Per strategy' above; full series: data/per_strategy_daily.csv (attributed)
 
 ## Per strategy gap by day, last 10 reconciled days (live attributed - expected, CNY)
 | day | ks_branch | fund_v3 | china_pairs | ks_ext | chem_fund | agri_event | stat_arb | total |
 |---|---|---|---|---|---|---|---|---|
-| 2026-09-07 | +14,497 | -13,469 | +5,034 | +4,389 | +5,238 | -5,895 | +5,696 | +15,489 |
-| 2026-09-08 | +17,805 | -8,077 | -5,553 | +6,538 | -1,317 | -623 | -2,646 | +6,127 |
-| 2026-09-09 | -7,595 | -33,341 | +11,030 | +264 | -4,004 | +264 | -11,081 | -44,463 |
+| 2026-09-07 | +14,497 | -13,469 | +5,034 | +4,322 | +5,238 | -5,895 | +5,002 | +14,729 |
+| 2026-09-08 | +19,225 | -11,154 | -6,827 | +6,538 | -1,317 | -623 | -2,665 | +3,177 |
+| 2026-09-09 | -7,595 | -33,341 | +11,030 | +264 | -7,384 | +264 | -11,081 | -47,843 |
 | 2026-09-10 | +23,009 | -15,227 | -6,098 | +8,543 | +17,433 | -3,382 | +6,600 | +30,878 |
 | 2026-09-11 | +29,683 | -84,428 | -16 | +65,014 | +9,555 | +5,657 | -12,742 | +12,723 |
-| 2026-09-14 | +88,782 | +4,357 | -3,914 | +12,671 | -30,819 | +21,428 | -10,504 | +82,001 |
-| 2026-09-15 | -6,961 | +21,190 | +2,625 | -77,908 | -58 | +13,975 | +6,862 | -40,274 |
-| 2026-09-16 | +6,605 | +6,290 | +8,956 | +16,578 | +10,627 | +11,524 | -469 | +60,111 |
-| 2026-09-17 | -19,361 | +27,766 | -2,820 | +14,258 | -13,185 | +1,927 | -8,057 | +528 |
-| 2026-09-18 | -23,531 | +14,729 | +3,852 | -13,118 | -27,728 | -15,561 | -345 | -61,701 |
-| sum | +122,932 | -80,210 | +13,096 | +37,230 | -34,257 | +29,314 | -26,685 | +61,421 |
+| 2026-09-14 | +88,782 | +2,617 | -3,914 | +12,671 | -31,479 | +21,428 | -14,504 | +75,601 |
+| 2026-09-15 | -6,961 | +12,550 | +2,625 | -76,468 | -58 | +13,975 | +6,862 | -47,474 |
+| 2026-09-16 | -19,513 | +4,940 | +8,956 | +14,358 | +10,627 | +11,524 | -2,421 | +28,471 |
+| 2026-09-17 | -11,597 | +19,432 | -2,058 | +14,258 | -9,885 | +1,927 | -10,209 | +1,868 |
+| 2026-09-18 | -21,265 | +8,897 | +3,852 | -809 | -27,728 | -15,561 | -423 | -53,036 |
+| sum | +108,265 | -109,183 | +12,584 | +48,692 | -34,997 | +29,314 | -35,580 | +19,096 |
 full series: data/per_strategy_daily.csv (day, strategy, expected, attributed, gap); a strategy's daily total foots to expected - live_gross once the shared and neither buckets are added.
 
 ## Live P&L by product, last 10 reconciled days (gross CNY, worst first)
