@@ -91,15 +91,11 @@ def main(argv=None) -> int:
 
     recon, missing, pending = reconcile.bridge_all(bt_weighted, scales,
                                                    forward_flags, incomplete)
-    if len(recon):
-        recon.to_csv(C.RECON_CSV)
-        print(f"reconciled {len(recon)} day(s): {recon.index[0]} -> {recon.index[-1]}")
-    else:
-        print("no reconcilable live days found")
     pending_alerts = [
         f"BT PENDING {d}: no mature backtest row for "
-        f"{', '.join(incomplete.get(d, []))} (nonzero weight) -- day held out "
-        f"of the bridge until the rows ship; it re-enters automatically."
+        f"{', '.join(incomplete.get(d, []))} (nonzero weight) -- day reconciled "
+        f"WITHOUT that sleeve's expected; its live P&L sits in bt_pending_live, "
+        f"not resid, until the rows ship."
         for d in pending]
     for msg in pending_alerts:
         print(msg)
@@ -113,6 +109,13 @@ def main(argv=None) -> int:
 
     attribution = (AT.attribute_all(list(recon.index), forward_flags, weights_hist)
                    if len(recon) else pd.DataFrame())
+    if len(recon):
+        recon = reconcile.peel_pending(recon, attribution)
+        recon.to_csv(C.RECON_CSV)
+        print(f"reconciled {len(recon)} day(s): {recon.index[0]} -> {recon.index[-1]}"
+              + (f" ({len(pending)} with a pending sleeve)" if pending else ""))
+    else:
+        print("no reconcilable live days found")
     run_days = [d for d in days_needed if d <= today]   # includes today's runs
     flags = (AT.live_flags(run_days, forward_flags, weights_hist)
              if run_days else {k: False for k in C.STRATEGIES})
@@ -144,6 +147,7 @@ def main(argv=None) -> int:
     state["last_run"] = {
         "at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "reconciled_through": str(recon.index[-1]) if len(recon) else None,
+        "bt_pending": {d: incomplete[d] for d in pending},
         "n_alerts": len(alert_list),
     }
     io_backtest.save_state(state)

@@ -43,7 +43,9 @@ def per_strategy_daily(live: pd.DataFrame, bt_bridge: pd.DataFrame | None,
     row times that day's scale -- the same numbers the "Per strategy" table
     sums over the whole live window, so the per-strategy gaps foot to
     ``expected - live_gross`` there. A strategy absent from either input on
-    a day contributes 0 for that side. Pure: no I/O.
+    a day contributes 0 for that side, except a NaN bridge cell (its
+    backtest row has not shipped): expected and gap stay blank, because
+    ``attributed - 0`` would print the sleeve's whole P&L as a gap. Pure.
     """
     rows = []
     if not len(live):
@@ -52,7 +54,9 @@ def per_strategy_daily(live: pd.DataFrame, bt_bridge: pd.DataFrame | None,
     for key in C.STRATEGIES:
         exp = pd.Series(0.0, index=live.index)
         if bt_bridge is not None and key in bt_bridge.columns:
-            exp = bt_bridge[key].reindex(live.index).fillna(0.0) * scale
+            exp = bt_bridge[key].reindex(live.index)
+            exp[~live.index.isin(bt_bridge.index)] = 0.0
+            exp = exp * scale
         att = pd.Series(0.0, index=live.index)
         if len(attribution) and key in attribution.columns:
             att = attribution[key].reindex(live.index).fillna(0.0)
@@ -227,28 +231,37 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
           f"({int(last.get('n_offbook', 0) or 0)} contract(s)) | "
           f"residual {_f(last['resid'])} (live re-marked to first decision, "
           f"vs the previous backtest row)")
+        if last.get("bt_pending"):
+            a(f"  PARTIAL: no backtest row yet for {last['bt_pending']} -- "
+              f"expected excludes it; its live P&L "
+              f"{_f(last.get('bt_pending_live', 0.0))} is held out of resid")
         a(f"  fees {_f(last['fees'])} | broker residual {_f(last['broker_resid'])} "
           f"-> live net {_f(last['live_net'])}")
         a("")
 
     if len(live):
-        for col in ("intraday_unfilled", "offbook_pnl"):
+        for col in ("intraday_unfilled", "offbook_pnl", "bt_pending_live"):
             if col not in live.columns:
                 live = live.assign(**{col: 0.0})
         cum = live[["expected", "exec_cost", "marking", "bookdiff_carry",
                     "bookdiff_creation", "intraday_unfilled", "offbook_pnl",
-                    "resid", "live_gross", "fees", "broker_resid",
-                    "live_net"]].sum()
+                    "bt_pending_live", "resid", "live_gross", "fees",
+                    "broker_resid", "live_net"]].sum()
+        n_pending = int((live.get("bt_pending", pd.Series(dtype=str))
+                         .fillna("").astype(str) != "").sum())
         a(f"## Cumulative bridge (live since {C.LIVE_START}, "
-          f"{len(live)} reconciled days)")
+          f"{len(live)} reconciled days"
+          + (f", {n_pending} with a sleeve's backtest pending" if n_pending else "")
+          + ")")
         a("| expected | -exec | +marking | +bookdiff | +intraday | +offbook "
-          "| +resid | = live gross | -fees | +broker_resid | = live net |")
-        a("|---|---|---|---|---|---|---|---|---|---|---|")
+          "| +bt pending | +resid | = live gross | -fees | +broker_resid | = live net |")
+        a("|---|---|---|---|---|---|---|---|---|---|---|---|")
         a(f"| {_f(cum['expected'])} | {_f(-cum['exec_cost'])} | "
           f"{_f(cum['marking'])} | "
           f"{_f(cum['bookdiff_carry'] + cum['bookdiff_creation'])} | "
           f"{_f(cum['intraday_unfilled'])} | "
           f"{_f(cum['offbook_pnl'])} | "
+          f"{_f(cum['bt_pending_live'])} | "
           f"{_f(cum['resid'])} | "
           f"{_f(cum['live_gross'])} | {_f(-cum['fees'])} | "
           f"{_f(cum['broker_resid'])} | {_f(cum['live_net'])} |")
@@ -333,7 +346,8 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
     psd = per_strategy_daily(live, bt_bridge, attribution)
     if len(psd):
         psd.to_csv(C.DATA / "per_strategy_daily.csv", index=False)
-        gap = psd.pivot(index="day", columns="strategy", values="gap").fillna(0.0)
+        # NaN kept: "-" is a sleeve whose backtest row has not shipped
+        gap = psd.pivot(index="day", columns="strategy", values="gap")
         cols = [k for k in C.STRATEGIES if k in gap.columns]
         tail = gap[cols].tail(n_tail)
         a(f"## Per strategy gap by day, last {len(tail)} reconciled days "
@@ -341,7 +355,8 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
         _day_table(a, tail, cols)
         a("full series: data/per_strategy_daily.csv (day, strategy, expected, "
           "attributed, gap); a strategy's daily total foots to expected - "
-          "live_gross once the shared and neither buckets are added.")
+          "live_gross once the shared and neither buckets are added. "
+          "'-' = that sleeve's backtest row has not shipped yet (BT PENDING).")
         a("")
 
     if len(live):
@@ -448,9 +463,11 @@ def _plot(path, live: pd.DataFrame, bt_series: dict[str, pd.DataFrame],
         "+resid": live["resid"].cumsum().values,
         "-fees": (-live["fees"].cumsum()).values,
     }
+    if "bt_pending_live" in live.columns and live["bt_pending_live"].abs().sum():
+        comp["+bt pending"] = live["bt_pending_live"].cumsum().values
     for (col, vals), colr in zip(comp.items(),
                                  ["#a33a2e", "#2f855a", "#805ad5", "#b83280",
-                                  "#2c7a7b", "#9a6b1e", "#4a5568"]):
+                                  "#2c7a7b", "#9a6b1e", "#4a5568", "#d69e2e"]):
         ax.plot(x, vals, lw=1.4, label=col, color=colr)
     ax.axhline(0, color="black", lw=0.7)
     ax.set_ylabel("CNY (cum)")

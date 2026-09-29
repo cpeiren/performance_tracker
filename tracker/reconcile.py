@@ -313,12 +313,13 @@ def weighted_bt(bt: pd.DataFrame, forward_flags: dict[str, bool],
     Forward days use the day's shipped merge weights, carrying the latest
     earlier day's forward when the day's own are not shipped yet.
 
-    A strategy with nonzero weight but NO mature backtest row makes the
-    day's expected UNKNOWN, not smaller: the day is listed in the returned
-    ``incomplete`` map ({day: [missing strategy keys]}) and the bridge holds
-    it out until the rows ship (they self-heal on the next payload -- e.g.
-    stat_arb's ledger is structurally T-1).  Silently zero-filling those
-    rows is how a same-day expected once shrank to the ks sleeve alone.
+    A strategy with nonzero weight but NO mature backtest row has an
+    UNKNOWN expected that day, not a zero one: its cell is NaN and the day
+    is listed in the returned ``incomplete`` map ({day: [missing keys]}).
+    Silently zero-filling is how a same-day expected once shrank to the ks
+    sleeve alone -- the NaN plus the map are what keep that visible.  The
+    day is still bridged (see ``bridge_all``); one sleeve's late ship must
+    never freeze the whole account's tracking.
 
     Returns (frame, weight problem messages, incomplete).
     """
@@ -357,6 +358,7 @@ def weighted_bt(bt: pd.DataFrame, forward_flags: dict[str, bool],
             if pd.notna(v):
                 out.at[d, key] = wi * float(v)
             else:
+                out.at[d, key] = float("nan")
                 missing.append(key)
         if missing:
             incomplete[d] = sorted(missing)
@@ -373,11 +375,16 @@ def bridge_all(bt_weighted: pd.DataFrame, scales: pd.Series,
     weighted_bt); a day's combined backtest gross is its row sum.
     ``scales``: date -> scale (from main's scale pass).
     ``forward_flags``: date -> True when the merged forward book executed.
-    ``incomplete``: days whose expected is unknown (weighted_bt found a
-    nonzero-weight strategy without a mature backtest row) -- those days are
-    HELD OUT of the bridge rather than reconciled against a partial
-    expected, and re-enter automatically once the rows ship (the whole
-    computation reruns from source every day).
+    ``incomplete``: days where a nonzero-weight strategy has no mature
+    backtest row.  Those days ARE bridged: expected covers the strategies
+    that shipped, and ``bt_pending`` names the ones that did not.  Every
+    live term (live_gross/net, fees, exec_cost, marking, bookdiff, offbook)
+    is independent of the backtest, so holding the day out would blank the
+    account's own P&L over one sleeve's late ledger (2026-09-24..29: a
+    stale stat_arb ledger froze the whole tracker at 09-23).  The pending
+    sleeves' live P&L is moved out of resid by ``peel_pending``; the whole
+    computation reruns from source every day, so the day completes itself
+    once the rows ship.
     Returns (frame indexed by date, missing-live days, pending days).
     """
     incomplete = incomplete or {}
@@ -400,11 +407,7 @@ def bridge_all(bt_weighted: pd.DataFrame, scales: pd.Series,
     prev = None
     for day in live_days:
         if day in incomplete:
-            # prev still advances: the day's live state exists and the next
-            # day's carry/marking legitimately reference it.
             pending.append(day)
-            prev = day
-            continue
         bt_row = bt_weighted.reindex([day]).fillna(0.0)
         bt_gross = float(bt_row.sum(axis=1).iloc[0]) if len(bt_row) else 0.0
         scale = float(scales.get(day, float("nan")))
@@ -413,6 +416,7 @@ def bridge_all(bt_weighted: pd.DataFrame, scales: pd.Series,
                          forward=bool(forward_flags.get(day)),
                          prev_forward=bool(forward_flags.get(prev)) if prev else False)
         if rec is not None:
+            rec["bt_pending"] = " ".join(incomplete.get(day, []))
             rows.append(rec)
         prev = day
 
@@ -420,3 +424,27 @@ def bridge_all(bt_weighted: pd.DataFrame, scales: pd.Series,
     if len(df):
         df = df.set_index("date").sort_index()
     return df, missing, pending
+
+
+def peel_pending(recon: pd.DataFrame, attribution: pd.DataFrame) -> pd.DataFrame:
+    """Move each pending sleeve's live-attributed P&L out of resid.
+
+    On a ``bt_pending`` day expected lacks those sleeves, so their live P&L
+    would otherwise land in resid and trip the residual alert on a number
+    that measures nothing.  It gets its own term, ``bt_pending_live``, and
+    the identity stays exact:
+        live_gross = expected - exec_cost + marking + bookdiff + intraday
+                     + offbook + bt_pending_live + resid
+    """
+    out = recon.copy()
+    out["bt_pending_live"] = 0.0
+    if not len(out) or "bt_pending" not in out.columns:
+        return out
+    for day, keys in out["bt_pending"].items():
+        if not keys or day not in attribution.index:
+            continue
+        v = sum(float(attribution.at[day, k]) for k in str(keys).split()
+                if k in attribution.columns and pd.notna(attribution.at[day, k]))
+        out.at[day, "bt_pending_live"] = v
+        out.at[day, "resid"] = out.at[day, "resid"] - v
+    return out

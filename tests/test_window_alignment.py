@@ -102,9 +102,38 @@ def test_weighted_bt_lags_all_but_stat_arb(monkeypatch):
     assert out.at["2026-09-02", "ks_branch"] == pytest.approx(0.8 * 10.0)
     assert out.at["2026-09-02", "stat_arb"] == pytest.approx(2.0)
     assert out.at["2026-09-03", "ks_branch"] == pytest.approx(0.8 * 20.0)
-    # the first live day has no previous ks_branch row: held out, not zeroed
+    # the first live day has no previous ks_branch row: unknown, not zeroed
     assert incomplete == {"2026-09-01": ["ks_branch"]}
-    assert out.at["2026-09-01", "ks_branch"] == 0.0
+    assert pd.isna(out.at["2026-09-01", "ks_branch"])
+    assert out.at["2026-09-01", "stat_arb"] == pytest.approx(1.0)
+
+
+def test_pending_sleeve_does_not_hold_the_day_out(fake_live):
+    """2026-09-24..29: stat_arb's ledger stalled at 09-23 and the tracker
+    froze there.  The day must still bridge, on the sleeves that shipped."""
+    bt_w = pd.DataFrame({"ks_branch": [_bt_window_row(D1, D2), _bt_window_row(D2, D3)],
+                         "stat_arb": [0.0, float("nan")]}, index=[D2, D3])
+    scales = pd.Series(1.0, index=[D2, D3])
+    fwd = {D2: True, D3: True}
+    recon, missing, pending = R.bridge_all(bt_w, scales, fwd, {D3: ["stat_arb"]})
+    assert list(recon.index) == [D2, D3]
+    assert pending == [D3]
+    assert recon.at[D3, "bt_pending"] == "stat_arb"
+    assert recon.at[D2, "bt_pending"] == ""
+    assert recon.at[D3, "expected"] == pytest.approx(_bt_window_row(D2, D3))
+
+
+def test_peel_pending_moves_sleeve_pnl_out_of_resid_and_keeps_identity():
+    recon = pd.DataFrame({"resid": [5.0, 40.0], "bt_pending": ["", "stat_arb china_pairs"]},
+                         index=[D2, D3])
+    attr = pd.DataFrame({"stat_arb": [7.0, 30.0], "china_pairs": [1.0, 4.0],
+                         "ks_branch": [9.0, 9.0]}, index=[D2, D3])
+    out = R.peel_pending(recon, attr)
+    assert out.at[D2, "bt_pending_live"] == 0.0 and out.at[D2, "resid"] == 5.0
+    assert out.at[D3, "bt_pending_live"] == pytest.approx(34.0)
+    assert out.at[D3, "resid"] == pytest.approx(6.0)
+    assert (out["resid"] + out["bt_pending_live"]).tolist() == pytest.approx(
+        (recon["resid"]).tolist())
 
 
 def test_bench_prices_take_the_earliest_snap_per_ticker(monkeypatch):

@@ -75,3 +75,20 @@ def test_alignment_ignores_days_outside_the_live_window_and_handles_missing():
     empty = per_strategy_daily(pd.DataFrame(), bridge, attr)
     assert list(empty.columns) == ["day", "strategy", "expected", "attributed", "gap"]
     assert len(empty) == 0
+
+
+def test_pending_bridge_cell_leaves_expected_and_gap_blank():
+    """A NaN bridge cell is a backtest row not shipped yet: printing
+    attributed - 0 as the gap would show the sleeve's whole P&L as a miss."""
+    bridge = pd.DataFrame({"stat_arb": [2.0, 4.0, float("nan")],
+                           "ks_branch": [1.0, 1.0, 1.0]}, index=DAYS)
+    attr = pd.DataFrame({"stat_arb": [3.0, 3.0, 9.0],
+                         "ks_branch": [1.0, 1.0, 1.0]}, index=DAYS)
+    out = per_strategy_daily(_live(1.0), bridge, attr)
+    sa = out[out.strategy == "stat_arb"].set_index("day")
+    assert pd.isna(sa.loc["2026-09-03", "expected"])
+    assert pd.isna(sa.loc["2026-09-03", "gap"])
+    assert sa.loc["2026-09-03", "attributed"] == 9.0
+    assert sa.loc["2026-09-02", "gap"] == -1.0
+    ks = out[out.strategy == "ks_branch"].set_index("day")
+    assert ks.loc["2026-09-03", "gap"] == 0.0
