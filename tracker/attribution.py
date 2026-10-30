@@ -42,7 +42,7 @@ from __future__ import annotations
 import pandas as pd
 
 import config as C
-from . import io_backtest, io_live
+from . import io_backtest, io_live, names
 from .dates import normalize_date
 
 #: below half a weighted lot net, a pro-rata split is noise -> shared bucket
@@ -124,32 +124,33 @@ def _holders_for(row, who: dict, prev_who: dict | None):
         io_live.lookup(prev_who, row["symbol"]) if prev_who else None)
 
 
-def _attribute_legacy(pnl: pd.DataFrame, who: dict[str, str],
-                      prev_who: dict[str, str] | None) -> dict[str, float]:
-    buckets = {b: 0.0 for b in BUCKETS}
-    for _, row in pnl.iterrows():
-        bucket = _holders_for(row, who, prev_who) or "neither"
-        buckets[bucket] += float(row["total_pnl"] or 0.0)
-    return buckets
+def split_row(row, who: dict, prev_who: dict | None,
+              forward: bool) -> list[tuple[str, float]]:
+    """``[(bucket, pnl_share)]`` for ONE live P&L row under the day's regime.
+
+    The single place the split rule lives.  Both the day's bucket totals and
+    the per-product cross below consume it, so the two can never disagree
+    about who held what.
+    """
+    v = float(row["total_pnl"] or 0.0)
+    c = _holders_for(row, who, prev_who)
+    if not c:
+        return [("neither", v)]
+    if not forward:
+        return [(c, v)]                       # legacy: c is one bucket name
+    net = sum(c.values())
+    gross = sum(abs(x) for x in c.values())
+    if abs(net) < max(NET_LOTS_FLOOR, NET_GROSS_FLOOR * gross):
+        return [("shared", v)]
+    return [(key, v * ci / net) for key, ci in c.items()]
 
 
-def _attribute_forward(pnl: pd.DataFrame, who: dict[str, dict[str, float]],
-                       prev_who: dict[str, dict[str, float]] | None,
-                       ) -> dict[str, float]:
+def _attribute(pnl: pd.DataFrame, who: dict, prev_who: dict | None,
+               forward: bool) -> dict[str, float]:
     buckets = {b: 0.0 for b in BUCKETS}
     for _, row in pnl.iterrows():
-        v = float(row["total_pnl"] or 0.0)
-        c = _holders_for(row, who, prev_who)
-        if not c:
-            buckets["neither"] += v
-            continue
-        net = sum(c.values())
-        gross = sum(abs(x) for x in c.values())
-        if abs(net) < max(NET_LOTS_FLOOR, NET_GROSS_FLOOR * gross):
-            buckets["shared"] += v
-            continue
-        for key, ci in c.items():
-            buckets[key] += v * ci / net
+        for bucket, share in split_row(row, who, prev_who, forward):
+            buckets[bucket] += share
     return buckets
 
 
@@ -166,14 +167,16 @@ def attribute_day(day: str, forward: bool, weights: dict[str, float] | None,
         return None
     if who is None:
         who = holder_map(day, forward, weights)
-    if forward:
-        return _attribute_forward(pnl, who, prev_who)
-    return _attribute_legacy(pnl, who, prev_who)
+    return _attribute(pnl, who, prev_who, forward)
 
 
-def attribute_all(days: list[str], forward_flags: dict[str, bool],
-                  weights_hist: dict[str, dict[str, float]]) -> pd.DataFrame:
-    rows = []
+def _walk(days: list[str], forward_flags: dict[str, bool],
+          weights_hist: dict[str, dict[str, float]]):
+    """Yield ``(day, pnl, who, prev_who, forward)`` once per day with live data.
+
+    Holder maps are the expensive part (they read the shipped books), so the
+    bucket totals and the per-product cross share one pass.
+    """
     #: last non-empty holder map seen, per regime -- a day whose books never
     #: shipped must not erase the fallback for the day after it
     prev_who: dict[bool, dict | None] = {True: None, False: None}
@@ -181,14 +184,47 @@ def attribute_all(days: list[str], forward_flags: dict[str, bool],
         fwd = bool(forward_flags.get(d))
         w = io_backtest.weights_for_day(d, weights_hist)[0] if fwd else None
         who = holder_map(d, fwd, w)
-        b = attribute_day(d, fwd, w, who=who, prev_who=prev_who[fwd])
+        pnl = io_live.daily_pnl(d)
+        prev = prev_who[fwd]
         if who:
             prev_who[fwd] = who
-        if b is not None:
-            b["date"] = normalize_date(d)
-            rows.append(b)
+        if pnl is not None:
+            yield normalize_date(d), pnl, who, prev, fwd
+
+
+def attribute_all(days: list[str], forward_flags: dict[str, bool],
+                  weights_hist: dict[str, dict[str, float]]) -> pd.DataFrame:
+    rows = []
+    for day, pnl, who, prev, fwd in _walk(days, forward_flags, weights_hist):
+        b = _attribute(pnl, who, prev, fwd)
+        b["date"] = day
+        rows.append(b)
     df = pd.DataFrame(rows)
     return df.set_index("date").sort_index() if len(df) else df
+
+
+def attribute_products(days: list[str], forward_flags: dict[str, bool],
+                       weights_hist: dict[str, dict[str, float]]) -> pd.DataFrame:
+    """``day, strategy, product, pnl`` -- the strategy x product cross.
+
+    The report already says which strategy lost and, separately, which
+    product lost.  Neither answers "which product did THIS strategy lose it
+    in", which is the question a bleeding sleeve actually raises.  Same split
+    rule as ``attribute_all`` (``split_row``), so summing this over products
+    reproduces that table exactly, ``shared`` and ``neither`` included.
+    """
+    acc: dict[tuple, float] = {}
+    for day, pnl, who, prev, fwd in _walk(days, forward_flags, weights_hist):
+        for _, row in pnl.iterrows():
+            product = names.product_root(str(row["symbol"]))
+            for bucket, share in split_row(row, who, prev, fwd):
+                key = (day, bucket, product)
+                acc[key] = acc.get(key, 0.0) + share
+    if not acc:
+        return pd.DataFrame(columns=["day", "strategy", "product", "pnl"])
+    out = pd.DataFrame([{"day": d, "strategy": s, "product": p, "pnl": v}
+                        for (d, s, p), v in acc.items()])
+    return out.sort_values(["day", "strategy", "pnl"]).reset_index(drop=True)
 
 
 def live_flags(days: list[str], forward_flags: dict[str, bool],

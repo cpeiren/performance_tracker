@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 import config as C
+from . import attribution
 from . import io_live
 from . import stats as S
 
@@ -117,6 +118,44 @@ def _product_section(a, days: list[str], n_days: int = 10,
       "the next capture lands, before fees) summed by product root; 'all "
       "products' foots to live gross. "
       "Full series: data/product_daily.csv")
+    a("")
+
+
+def _strategy_product_section(a, days: list[str], forward_flags, weights_hist,
+                              n_days: int = 10, n_cells: int = 15) -> None:
+    """Which product each strategy lost in -- the cross the two tables above
+    cannot give on their own.
+
+    ``Per strategy`` says a sleeve bled; ``by product`` says a product bled.
+    Only the cross says whether one strategy owns a product's loss or several
+    are in it together, which is the difference between a broken signal and a
+    market move.  Same pro-rata split as the bucket table, so the rows sum
+    back to it.  Full series: data/strategy_product_daily.csv.
+    """
+    sp = attribution.attribute_products(days, forward_flags, weights_hist)
+    if not len(sp):
+        return
+    sp.to_csv(C.DATA / "strategy_product_daily.csv", index=False)
+    tail = sorted(set(sp["day"]))[-n_days:]
+    w = sp[sp["day"].isin(tail)]
+    cells = (w.groupby(["strategy", "product"], as_index=False)["pnl"].sum()
+              .sort_values("pnl"))
+    worst = cells.head(n_cells)
+    a(f"## Worst (strategy, product) cells, last {len(tail)} reconciled days "
+      "(attributed gross CNY)")
+    a("| strategy | product | " + " | ".join(d[5:] for d in tail) + " | sum |")
+    a("|---|---|" + "---|" * (len(tail) + 1))
+    piv = w.pivot_table(index=["strategy", "product"], columns="day",
+                        values="pnl", aggfunc="sum").reindex(columns=tail).fillna(0.0)
+    for _, r in worst.iterrows():
+        key = (r["strategy"], r["product"])
+        row = piv.loc[key] if key in piv.index else pd.Series(0.0, index=tail)
+        a(f"| {r['strategy']} | {r['product']} | "
+          + " | ".join(_f(row[d]) for d in tail) + f" | {_f(r['pnl'])} |")
+    a("each contract's live P&L split by the same weighted-lot pro-rata as "
+      "'Live P&L by strategy'; summing a strategy's products reproduces its "
+      "row there (shared / neither included as their own strategy). "
+      "Full series: data/strategy_product_daily.csv")
     a("")
 
 
@@ -361,6 +400,8 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
 
     if len(live):
         _product_section(a, list(live.index), n_days=n_tail)
+        _strategy_product_section(a, list(live.index), forward_flags,
+                                  weights_hist, n_days=n_tail)
 
     a("## Data health")
     if len(live):
