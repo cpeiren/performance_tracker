@@ -35,6 +35,52 @@ def _bps(cny: float, notional: float) -> str:
     return f"{1e4 * cny / notional:+.2f}" if notional else "-"
 
 
+def _vintage_section(a, vint: pd.DataFrame, restate: pd.Series | None) -> None:
+    """Which series the numbers are built on: as-shipped pins (the bridge)
+    vs the current series, and the vintage behind every restatement."""
+    if not len(vint) and (restate is None or not len(restate)):
+        return
+    a("## Backtest vintages (full series kept on every restatement)")
+    if restate is not None and len(restate):
+        a("expected on the CURRENT series minus expected on the as-shipped pins, live window, "
+          "weighted CNY (the bridge uses the pins):")
+        a("| strategy | restated |")
+        a("|---|---|")
+        for k, v in restate.items():
+            a(f"| {k} | {_f(v)} |")
+        a(f"| all | {_f(restate.sum())} |")
+    if len(vint):
+        last = vint.groupby("strategy").tail(1)
+        a("| strategy | vintages | latest | cause | commit | rows restated | net change (full size) |")
+        a("|---|---|---|---|---|---|---|")
+        for _, r in last.iterrows():
+            n = int((vint["strategy"] == r["strategy"]).sum())
+            commit = str(r["source_commit"])[:7] if isinstance(r["source_commit"], str) else "-"
+            a(f"| {r['strategy']} | {n} | {r['vintage']} | {r['cause']} | {commit} | "
+              f"{int(r['n_restated'])} | {_f(float(r['net_change']))} |")
+        a("full series: data/backtest/vintages/<strategy>/; index: data/backtest/vintages/index.csv")
+    a("")
+
+
+def _paper_section(a, paper: dict[str, dict]) -> None:
+    """Strategies paused by weight: tracked, not traded."""
+    if not paper:
+        return
+    a("## Paper strategies (weight 0 in the forward book: tracked, not traded)")
+    a("| strategy | weight 0 since | bt since (full) | bt last 20d | drawdown now | worst before pause "
+      "| 60d Sharpe | paper-live since (full) | paper days | book coverage |")
+    a("|---|---|---|---|---|---|---|---|---|---|")
+    for k, p in paper.items():
+        sh = "-" if pd.isna(p["sharpe_60d"]) else f"{p['sharpe_60d']:.2f}"
+        cov = "-" if pd.isna(p["paper_coverage"]) else f"{100 * p['paper_coverage']:.0f}%"
+        a(f"| {k} | {p['since']} | {_f(p['bt_since'])} | {_f(p['bt_20d'])} | {_f(p['dd_now'])} | "
+          f"{_f(p['dd_worst_before'])} | {sh} | {_f(p['paper_since'])} | {p['paper_days']} | {cov} |")
+    a("paper-live = the strategy's own pinned full-size book of D-1 x the settlement-to-settlement move "
+      "of D, on contracts the live account prices (coverage). Re-entry: owner's call, at an attended "
+      "morning merge; reweighting is Execution/weights_forward.json + weights_changelog.csv.")
+    a("")
+
+
 def per_strategy_daily(live: pd.DataFrame, bt_bridge: pd.DataFrame | None,
                        attribution: pd.DataFrame) -> pd.DataFrame:
     """Per-day, per-strategy expected vs live-attributed pnl, long format.
@@ -229,7 +275,10 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
                  bt_bridge: pd.DataFrame | None = None,
                  pin_info: dict | None = None,
                  weights_hist: dict[str, dict[str, float]] | None = None,
-                 forward_flags: dict[str, bool] | None = None) -> None:
+                 forward_flags: dict[str, bool] | None = None,
+                 vintages: pd.DataFrame | None = None,
+                 restated: pd.Series | None = None,
+                 paper: dict[str, dict] | None = None) -> None:
     weights_hist = weights_hist or {}
     forward_flags = forward_flags or {}
     md_path = C.DAILY_DIR / f"{day}.md"
@@ -402,6 +451,9 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
         _product_section(a, list(live.index), n_days=n_tail)
         _strategy_product_section(a, list(live.index), forward_flags,
                                   weights_hist, n_days=n_tail)
+
+    _paper_section(a, paper or {})
+    _vintage_section(a, vintages if vintages is not None else pd.DataFrame(), restated)
 
     a("## Data health")
     if len(live):
