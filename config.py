@@ -28,6 +28,7 @@ INBOX = CNEXEC / "inbox"                       # ks/, fundamental/ (books + meta
 INCOMING = TRACKER_ROOT / "incoming"           # ship-script payloads land here
 DATA = TRACKER_ROOT / "data"
 BACKTEST_DIR = DATA / "backtest"               # canonical per-strategy series
+VINTAGE_DIR = BACKTEST_DIR / "vintages"        # <strategy>/<stamp>_<commit>.csv + index.csv (one per restatement)
 FORWARD_BOOKS_DIR = DATA / "forward" / "books"    # <date>__<src>.json (as-shipped, first write wins)
 FORWARD_WEIGHTS_DIR = DATA / "forward" / "weights"  # <date>.json (as-shipped, first write wins)
 RECON_CSV = DATA / "reconciliation.csv"
@@ -35,7 +36,7 @@ STATE_JSON = DATA / "state.json"
 REPORT_DIR = TRACKER_ROOT / "reports"
 DAILY_DIR = REPORT_DIR / "daily"
 
-for _d in (INCOMING, BACKTEST_DIR, FORWARD_BOOKS_DIR, FORWARD_WEIGHTS_DIR,
+for _d in (INCOMING, BACKTEST_DIR, VINTAGE_DIR, FORWARD_BOOKS_DIR, FORWARD_WEIGHTS_DIR,
            DAILY_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 

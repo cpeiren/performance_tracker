@@ -19,6 +19,7 @@ import config as C
 from . import alerts as A
 from . import attribution as AT
 from . import ingest, io_backtest, io_live, reconcile, report
+from . import paper as P
 
 
 def compute_scales() -> pd.DataFrame:
@@ -128,6 +129,18 @@ def main(argv=None) -> int:
         recon, missing, scales_df, state, bt_series, today, pin_div=pin_div,
         forward_flags=forward_flags, weights_hist=weights_hist)
 
+    # the same expected on the CURRENT series (no pin overlay): the gap is the
+    # restatement since shipping, per strategy; the bridge keeps the pins
+    live_days = list(recon.index) if len(recon) else []
+    restated = pd.Series(dtype=float)
+    if live_days:
+        bt_weighted_cur, _, _ = reconcile.weighted_bt(bt_raw, forward_flags, weights_hist)
+        restated = (bt_weighted_cur.reindex(live_days).fillna(0.0)
+                    - bt_weighted.reindex(live_days).fillna(0.0)).sum()
+        restated = restated[restated.abs() > 0.5].round(0)
+    paper = {k: P.summary(k, since, bt_series.get(k), live_days)
+             for k, since in P.paused(weights_hist).items()}
+
     pin_info = {
         "n_days": len(state.get("bt_pinned", {})),
         "divergent": {s: len(e["dates"]) for s, e in pin_div.items()},
@@ -138,7 +151,8 @@ def main(argv=None) -> int:
                         missing_bucket, scales_df, attribution, bt_series,
                         flags, alert_list, bt_bridge=bt_weighted,
                         pin_info=pin_info, weights_hist=weights_hist,
-                        forward_flags=forward_flags)
+                        forward_flags=forward_flags, vintages=ingest.vintages(),
+                        restated=restated, paper=paper)
     print(f"report: reports/daily/{today}.md (+ latest.md/png)")
 
     state["scale_history"] = [
