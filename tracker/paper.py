@@ -5,10 +5,11 @@ pipeline and still ships its book and backtest every day; only the merge
 multiplies its lots by zero.  It is tracked, not traded: the report shows its
 own full-size backtest over the pause, its drawdown against its history, its
 rolling Sharpe, and a PAPER-LIVE series -- its own pinned full-size book of
-D-1 times the settlement-to-settlement move of D (the holdings method, which
-reproduced the account's position P&L within 2% on 10-27..10-29).  Only
-contracts the live account also prices that day can be marked; the coverage
-column says how much of the book that was.  Re-entry stays the owner's call.
+D-1 times the settlement-to-settlement move of D -- the holdings method, priced
+by the same io_live.settle_move as the forward attribution, so a paper number
+and a live one are the same measurement.  Only contracts the day's state
+capture marks can be priced; the coverage column says how much of the book
+that was.  Re-entry stays the owner's call.
 """
 
 from __future__ import annotations
@@ -44,27 +45,20 @@ def paused(weights_hist: dict[str, dict[str, float]]) -> dict[str, str]:
 def paper_live(key: str, days: list[str]) -> pd.DataFrame:
     """Per live day: (pnl, coverage) of ``key``'s own full-size book of the
     previous day x the settlement-to-settlement move of the day."""
-    rows, books_prev = [], None
+    rows, books_prev, mult = [], None, None
     for d in days:
         book = io_backtest.component_books(d).get(key)
-        pnl = io_live.daily_pnl(d)
-        st = io_live.state(d) or {}
-        if books_prev and pnl is not None:
-            fin = io_live.final_settles(d)
-            mult = {s: float(p.get("multiplier") or 0.0)
-                    for s, p in (st.get("positions") or {}).items()}
-            prev = dict(zip(pnl["symbol"].astype(str), pnl["settle_prev"]))
-            close = dict(zip(pnl["symbol"].astype(str), pnl["settle_now"]))
+        if books_prev and io_live.state(d):
+            if mult is None:
+                mult = io_live.product_multipliers()
+            move = io_live.settle_move(d, mult)     # the attribution's pricing
             tot = gross = priced = 0.0
             for t, lots in books_prev.items():
                 gross += abs(lots)
-                s0 = io_live.lookup(prev, t)
-                s1 = io_live.lookup(fin, t)
-                s1 = io_live.lookup(close, t) if s1 is None else s1
-                m = io_live.lookup(mult, t)
-                if s0 is None or s1 is None or not m or any(map(pd.isna, (s0, s1))):
+                per_lot = io_live.lookup(move, t)
+                if per_lot is None:
                     continue
-                tot += lots * (float(s1) - float(s0)) * m
+                tot += lots * per_lot
                 priced += abs(lots)
             rows.append({"date": d, "pnl": tot,
                          "coverage": priced / gross if gross else float("nan")})

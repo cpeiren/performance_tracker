@@ -93,11 +93,11 @@ def test_paused_reports_the_first_day_of_the_current_zero_run():
 def test_paper_live_marks_the_previous_book_to_the_settlement_move(monkeypatch):
     books = {"2026-11-02": {"agri_event": {"p2701": 9, "y2701": -10}},
              "2026-11-03": {"agri_event": {"p2701": 9, "y2701": -10}}}
-    pnl = {"2026-11-03": pd.DataFrame({"symbol": ["p2701"], "settle_prev": [9000.0], "settle_now": [9050.0]})}
+    st = {"marks": {"p2701": {"pre_settle": 9000.0, "settle": 9050.0}}}
     monkeypatch.setattr(P.io_backtest, "component_books", lambda d: books.get(d, {}))
-    monkeypatch.setattr(P.io_live, "daily_pnl", lambda d: pnl.get(d))
-    monkeypatch.setattr(P.io_live, "state", lambda d: {"positions": {"p2701": {"multiplier": 10}}})
+    monkeypatch.setattr(P.io_live, "state", lambda d: st)
+    monkeypatch.setattr(P.io_live, "product_multipliers", lambda: {"p": 10.0, "y": 10.0})
     monkeypatch.setattr(P.io_live, "final_settles", lambda d: {"p2701": 9060.0})
     out = P.paper_live("agri_event", ["2026-11-02", "2026-11-03"])
     assert out.loc["2026-11-03", "pnl"] == pytest.approx(9 * (9060.0 - 9000.0) * 10)   # settlement, not close
-    assert out.loc["2026-11-03", "coverage"] == pytest.approx(9 / 19)                 # y2701 not priced live
+    assert out.loc["2026-11-03", "coverage"] == pytest.approx(9 / 19)                 # y2701 not marked

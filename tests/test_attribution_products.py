@@ -2,7 +2,7 @@
 
 The claim the report makes is that summing a strategy's products reproduces
 its row in the bucket table.  These tests pin exactly that, in both regimes,
-and pin that the shared/neither escape hatches are carried through unchanged.
+and pin that the trading/neither buckets are carried through unchanged.
 """
 
 import sys
@@ -18,6 +18,7 @@ from tracker import attribution as AT  # noqa: E402
 from tracker import io_backtest, io_live  # noqa: E402
 
 DAYS = ["2026-09-01", "2026-09-02"]
+SCALES = {d: 1.0 for d in DAYS}
 
 
 def _pnl(rows):
@@ -41,12 +42,15 @@ def wired(monkeypatch):
     monkeypatch.setattr(io_backtest, "component_books", lambda d: books.get(d, {}))
     monkeypatch.setattr(io_backtest, "weights_for_day",
                         lambda d, h: ({"ks_branch": 1.0, "fund_v3": 1.0}, None))
+    monkeypatch.setattr(io_live, "product_multipliers", lambda: {})
+    monkeypatch.setattr(io_live, "settle_move", lambda d, m: {
+        "rb2701": -2.0, "rb2705": 1.0, "bu2612": 5.0})
     return {d: True for d in DAYS}
 
 
 def test_products_sum_back_to_the_bucket_table(wired):
-    buckets = AT.attribute_all(DAYS, wired, {})
-    cross = AT.attribute_products(DAYS, wired, {})
+    buckets = AT.attribute_all(DAYS, wired, {}, SCALES)
+    cross = AT.attribute_products(DAYS, wired, {}, SCALES)
     rolled = cross.groupby(["day", "strategy"])["pnl"].sum().unstack(fill_value=0.0)
     for day in buckets.index:
         for key in rolled.columns:
@@ -54,21 +58,22 @@ def test_products_sum_back_to_the_bucket_table(wired):
 
 
 def test_total_foots_to_live_gross(wired):
-    cross = AT.attribute_products(DAYS, wired, {})
+    cross = AT.attribute_products(DAYS, wired, {}, SCALES)
     assert cross["pnl"].sum() == pytest.approx(100.0 - 40.0 - 60.0 - 10.0 + 30.0 + 7.0)
 
 
 def test_product_root_not_contract(wired):
-    cross = AT.attribute_products(DAYS, wired, {})
+    cross = AT.attribute_products(DAYS, wired, {}, SCALES)
     assert set(cross["product"]) == {"rb", "bu", "zz"}
-    # rb2701 and rb2705 collapse into one rb cell for ks_branch on day 1
-    rb = cross[(cross["day"] == "2026-09-01") & (cross["strategy"] == "ks_branch")
+    # day 2 marks day 1's book: ks_branch rb2701 and rb2705 collapse into one rb cell
+    rb = cross[(cross["day"] == "2026-09-02") & (cross["strategy"] == "ks_branch")
                & (cross["product"] == "rb")]
     assert len(rb) == 1
+    assert rb["pnl"].iloc[0] == pytest.approx(4.0 * -2.0 + -2.0 * 1.0)
 
 
 def test_unheld_contract_lands_in_neither_under_its_own_product(wired):
-    cross = AT.attribute_products(DAYS, wired, {})
+    cross = AT.attribute_products(DAYS, wired, {}, SCALES)
     row = cross[(cross["strategy"] == "neither") & (cross["product"] == "zz")]
     assert len(row) == 1
     assert row["pnl"].iloc[0] == pytest.approx(7.0)
@@ -78,6 +83,6 @@ def test_empty_input_returns_the_declared_schema(monkeypatch):
     monkeypatch.setattr(io_live, "daily_pnl", lambda d: None)
     monkeypatch.setattr(io_backtest, "component_books", lambda d: {})
     monkeypatch.setattr(io_backtest, "weights_for_day", lambda d, h: ({}, None))
-    out = AT.attribute_products(DAYS, {d: True for d in DAYS}, {})
+    out = AT.attribute_products(DAYS, {d: True for d in DAYS}, {}, SCALES)
     assert list(out.columns) == ["day", "strategy", "product", "pnl"]
     assert len(out) == 0

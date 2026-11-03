@@ -108,7 +108,8 @@ def main(argv=None) -> int:
                 and d not in incomplete):  # partial expected must not enter the bucket
             missing_bucket += float(s) * float(bt_weighted.loc[d].fillna(0.0).sum())
 
-    attribution = (AT.attribute_all(list(recon.index), forward_flags, weights_hist)
+    attribution = (AT.attribute_all(list(recon.index), forward_flags, weights_hist,
+                                    recon["scale"])
                    if len(recon) else pd.DataFrame())
     if len(recon):
         recon = reconcile.peel_pending(recon, attribution)

@@ -102,3 +102,29 @@ def test_daily_pnl_adds_close_to_settlement_move(monkeypatch, tmp_path):
     assert io_live.day_settles("2026-09-17")["p2705"] == 10511.0
     assert io_live.day_settles("2026-09-18") == {}         # no marks in fixture
     assert io_live.final_settles("2026-09-18") == {}       # latest: provisional
+
+
+def test_settle_move_prices_contracts_the_account_does_not_hold(monkeypatch, tmp_path):
+    """The holdings attribution's pricing: (settlement D - settlement D-1) x
+    multiplier, for every contract the capture MARKS -- a leg the merge
+    offset to zero is in marks, not positions -- with the multiplier taken
+    by product root from any day's positions."""
+    import json
+    (tmp_path / "state_20260916.json").write_text(json.dumps(
+        {"positions": {"rb2610": {"net": 3, "multiplier": 10, "settle": 3100}}}))
+    (tmp_path / "state_20260917.json").write_text(json.dumps(
+        {"marks": {"rb2701": {"pre_settle": 3200, "settle": 3150},
+                   "lh2701": {"pre_settle": 14000, "settle": 14100}},
+         "positions": {"p2705": {"net": 28, "multiplier": 10,
+                                 "pre_settle": 10509, "settle": 10417}}}))
+    (tmp_path / "state_20260918.json").write_text(json.dumps(
+        {"marks": {"rb2701": {"pre_settle": 3160}},
+         "positions": {"p2705": {"net": 28, "multiplier": 10, "pre_settle": 10511}}}))
+    monkeypatch.setattr(C, "PNL_DIR", tmp_path)
+    mult = io_live.product_multipliers()
+    assert mult == {"rb": 10.0, "p": 10.0}
+    move = io_live.settle_move("2026-09-17", mult)
+    assert move["rb2701"] == (3160 - 3200) * 10           # official, not the close
+    assert move["p2705"] == (10511 - 10509) * 10
+    assert "lh2701" not in move                           # no known multiplier
+    assert io_live.settle_move("2026-09-19", mult) == {}  # no capture

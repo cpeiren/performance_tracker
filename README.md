@@ -37,8 +37,10 @@ Regimes (detected per day from the run records, never by date):
 - FORWARD (2026-08-31 on): the account trades ONE merged book of all 7
   signals, weighted upstream (Execution/weights_forward.json); expected =
   scale x sum_i w_i x bt_i, the ideal book is the shipped forward book, and
-  per-strategy live attribution is PRO-RATED by weighted full-size lots
-  (ill-conditioned splits -- near-offsetting weighted lots -- go to shared).
+  per-strategy live attribution is HOLDINGS: each strategy's previous-day
+  weighted book x scale x the settlement move, with the remainder (fills vs
+  settlement, lot rounding) in a `trading` bucket; every day foots to live
+  gross (pro-rata by lots until 2026-11-03, see tracker/attribution.py).
   Weights and component books are pinned per day, first write wins.
 
 The bridge (account-level, gross):

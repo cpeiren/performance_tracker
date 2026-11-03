@@ -168,17 +168,17 @@ def _product_section(a, days: list[str], n_days: int = 10,
 
 
 def _strategy_product_section(a, days: list[str], forward_flags, weights_hist,
-                              n_days: int = 10, n_cells: int = 15) -> None:
+                              scales, n_days: int = 10, n_cells: int = 15) -> None:
     """Which product each strategy lost in -- the cross the two tables above
     cannot give on their own.
 
     ``Per strategy`` says a sleeve bled; ``by product`` says a product bled.
     Only the cross says whether one strategy owns a product's loss or several
     are in it together, which is the difference between a broken signal and a
-    market move.  Same pro-rata split as the bucket table, so the rows sum
+    market move.  Same split as the bucket table, so the rows sum
     back to it.  Full series: data/strategy_product_daily.csv.
     """
-    sp = attribution.attribute_products(days, forward_flags, weights_hist)
+    sp = attribution.attribute_products(days, forward_flags, weights_hist, scales)
     if not len(sp):
         return
     sp.to_csv(C.DATA / "strategy_product_daily.csv", index=False)
@@ -198,9 +198,9 @@ def _strategy_product_section(a, days: list[str], forward_flags, weights_hist,
         row = piv.loc[key] if key in piv.index else pd.Series(0.0, index=tail)
         a(f"| {r['strategy']} | {r['product']} | "
           + " | ".join(_f(row[d]) for d in tail) + f" | {_f(r['pnl'])} |")
-    a("each contract's live P&L split by the same weighted-lot pro-rata as "
-      "'Live P&L by strategy'; summing a strategy's products reproduces its "
-      "row there (shared / neither included as their own strategy). "
+    a("same holdings split as 'Live P&L by strategy'; summing a strategy's "
+      "products reproduces its row there (trading / neither included as their "
+      "own strategy). "
       "Full series: data/strategy_product_daily.csv")
     a("")
 
@@ -404,13 +404,16 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
           f"{attributed} | {note} |")
     if len(attribution):
         a(f"| shared bucket | - | - | - | "
-          f"{_f(attribution['shared'].sum())} | legacy multi-holder / forward offsetting (split refused, not a cost) |")
+          f"{_f(attribution['shared'].sum())} | legacy days only: a contract both per-source books held |")
         a(f"| neither bucket (no target) | - | - | - | "
           f"{_f(attribution['neither'].sum())} | named by no book that day or the day before |")
-        a("forward-day attribution is pro-rated by weighted full-size lots; "
-          "legacy days remain exclusive-holder. A contract the day's own "
-          "books do not name resolves against the previous same-regime day, "
-          "so a roll-out's exit P&L is charged to whoever held it.")
+        a(f"| trading bucket | - | - | - | "
+          f"{_f(attribution['trading'].sum())} | forward days: live P&L minus the strategies' holdings "
+          "(fills vs settlement on rebalances, lot rounding, scale changes) |")
+        a("forward days: each strategy is its own previous-day weighted book x "
+          "scale x the settlement-to-settlement move (holdings); legacy days "
+          "remain exclusive-holder. The gap tables (attributed - expected) "
+          "therefore exclude execution, which sits in trading.")
     a("")
 
     # Per-strategy per-DAY gaps, so a sleeve's shortfall can be judged on its
@@ -420,13 +423,13 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
     if len(attribution):
         att = attribution.loc[attribution.index.isin(live.index)].fillna(0.0)
         cols = [k for k in C.STRATEGIES if k in att.columns] + [
-            b for b in ("shared", "neither") if b in att.columns]
+            b for b in ("shared", "neither", "trading") if b in att.columns]
         tail = att[cols].tail(n_tail)
         a(f"## Live P&L by strategy, last {len(tail)} reconciled days "
           "(attributed gross CNY)")
         _day_table(a, tail, cols)
-        a("forward days pro-rate each contract's live P&L by weighted "
-          "full-size lots; total foots to live gross. Live-window sums: "
+        a("forward days: previous-day weighted book x scale x settlement move "
+          "per strategy, the rest in trading; total foots to live gross. Live-window sums: "
           "'Per strategy' above; full series: data/per_strategy_daily.csv "
           "(attributed)")
         a("")
@@ -443,14 +446,14 @@ def write_report(day: str, recon: pd.DataFrame, missing: list[str],
         _day_table(a, tail, cols)
         a("full series: data/per_strategy_daily.csv (day, strategy, expected, "
           "attributed, gap); a strategy's daily total foots to expected - "
-          "live_gross once the shared and neither buckets are added. "
+          "live_gross once the shared, neither and trading buckets are added. "
           "'-' = that sleeve's backtest row has not shipped yet (BT PENDING).")
         a("")
 
     if len(live):
         _product_section(a, list(live.index), n_days=n_tail)
         _strategy_product_section(a, list(live.index), forward_flags,
-                                  weights_hist, n_days=n_tail)
+                                  weights_hist, live["scale"], n_days=n_tail)
 
     _paper_section(a, paper or {})
     _vintage_section(a, vintages if vintages is not None else pd.DataFrame(), restated)

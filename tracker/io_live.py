@@ -105,6 +105,47 @@ def day_settles(day: str) -> dict[str, float]:
     return out
 
 
+def product_multipliers() -> dict[str, float]:
+    """{product_root: contract multiplier} over every state capture.
+
+    A contract the account does not hold that day -- offset to zero in the
+    merged book, or held only by a weight-0 strategy -- still needs one to be
+    priced, so the map is keyed by product root and built from all days.
+    """
+    out: dict[str, float] = {}
+    for p in sorted(C.PNL_DIR.glob("state_*.json")):
+        with open(p) as fh:
+            st = json.load(fh)
+        for sym, pos in (st.get("positions") or {}).items():
+            if pos.get("multiplier"):
+                out[names.product_root(sym)] = float(pos["multiplier"])
+    return out
+
+
+def settle_move(day: str, mult: dict[str, float]) -> dict[str, float]:
+    """{ticker: CNY earned per lot held through ``day``}.
+
+    (settlement(D) - settlement(D-1)) x multiplier: D-1's official settlement
+    is the day's own capture's ``pre_settle``, D's comes from ``day_settles``
+    (official once the next capture lands, the close mark before).  Contracts
+    the capture does not mark, or whose product has no known multiplier, are
+    absent.
+    """
+    st = state(day)
+    if not st:
+        return {}
+    now = day_settles(day)
+    out: dict[str, float] = {}
+    for block in ("marks", "positions"):
+        for sym, v in (st.get(block) or {}).items():
+            s0, s1 = v.get("pre_settle"), now.get(sym)
+            m = mult.get(names.product_root(sym))
+            if sym in out or s0 is None or s1 is None or not m:
+                continue
+            out[sym] = (float(s1) - float(s0)) * m
+    return out
+
+
 def daily_pnl(day: str) -> pd.DataFrame | None:
     """Per-symbol daily P&L for one day, sentinel rows removed. None if missing.
 
