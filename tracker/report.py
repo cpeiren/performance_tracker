@@ -76,7 +76,8 @@ def _paper_section(a, paper: dict[str, dict]) -> None:
         a(f"| {k} | {p['since']} | {_f(p['bt_since'])} | {_f(p['bt_20d'])} | {_f(p['dd_now'])} | "
           f"{_f(p['dd_worst_before'])} | {sh} | {_f(p['paper_since'])} | {p['paper_days']} | {cov} |")
     a("paper-live = the strategy's own pinned full-size book of D-1 x the settlement-to-settlement move "
-      "of D, on contracts the live account prices (coverage). Re-entry: owner's call, at an attended "
+      "of D, priced like the live attribution, on contracts the day's state capture marks (coverage). "
+      "Re-entry: owner's call, at an attended "
       "morning merge; reweighting is Execution/weights_forward.json + weights_changelog.csv.")
     a("")
 
