@@ -573,29 +573,21 @@ def _plot(path, live: pd.DataFrame, bt_series: dict[str, pd.DataFrame],
     ax.grid(alpha=0.25)
 
     ax = axes[2]
-    total = wtotal = None
+    wtotal = None
     for key, df in bt_series.items():
-        if not len(df):
-            continue
-        s = df["gross_pnl"]
-        total = s if total is None else total.add(s, fill_value=0.0)
         w = (cur_w or {}).get(key, 0.0)
-        if w:
-            ws = s * w
+        if w and len(df):
+            ws = df["gross_pnl"] * w
             wtotal = ws if wtotal is None else wtotal.add(ws, fill_value=0.0)
-    if total is not None and len(total):
-        xt = pd.to_datetime(total.index)
-        ax.plot(xt, total.cumsum(), lw=1.4, color="#4a5568",
-                label="all 7 backtests, full size (cum, 2026)")
-        if wtotal is not None:
-            xw = pd.to_datetime(wtotal.index)
-            ax.plot(xw, wtotal.cumsum(), lw=1.4, color="#2f855a",
-                    label="forward-weighted (current w), full size")
+    if wtotal is not None and len(wtotal):
+        xw = pd.to_datetime(wtotal.index)
+        ax.plot(xw, wtotal.cumsum(), lw=1.4, color="#2f855a",
+                label="all books at today's weights (cum, 2026; not the bridge)")
         ax.axvline(pd.Timestamp(C.LIVE_START), color="#c05621", ls=":",
                    lw=1.2, label="live start")
     ax.axhline(0, color="black", lw=0.7)
     ax.set_ylabel("CNY (cum)")
-    ax.set_title("Full-size backtest context (2026 OOS)")
+    ax.set_title("Backtest context at today's weights (2026 OOS)")
     ax.legend(fontsize=8, frameon=False)
     ax.grid(alpha=0.25)
 

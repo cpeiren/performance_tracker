@@ -34,7 +34,7 @@ Inputs (on the box):
 Regimes (detected per day from the run records, never by date):
 - LEGACY (live start 2026-08-18 .. 2026-08-28): the account traded the ks +
   fundamental per-source books unweighted; expected = scale x (ks + fund).
-- FORWARD (2026-08-31 on): the account trades ONE merged book of all 7
+- FORWARD (2026-08-31 on): the account trades ONE merged book of all
   signals, weighted upstream (Execution/weights_forward.json); expected =
   scale x sum_i w_i x bt_i, the ideal book is the shipped forward book, and
   per-strategy live attribution is HOLDINGS: each strategy's previous-day

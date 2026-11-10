@@ -55,6 +55,8 @@ STRATEGIES = {
     "chem_fund":   ("Chemical fundamental",        None),
     "agri_event":  ("Agriculture event-driven",    None),
     "stat_arb":    ("Factor-neutral stat arb",     None),
+    "fpe":         ("Fund pipeline ensemble",      None),
+    "ks_outright": ("Outright trend + basis",      None),
 }
 
 #: Inbox source -> strategy key (reverse of the live half of STRATEGIES).
@@ -81,6 +83,8 @@ FORWARD_SRC_TO_STRATEGY = {
     "agri":        "agri_event",
     "chem":        "chem_fund",
     "ksext":       "ks_ext",
+    "fpe":         "fpe",
+    "ksoutright":  "ks_outright",
 }
 STRATEGY_TO_FORWARD_SRC = {v: k for k, v in FORWARD_SRC_TO_STRATEGY.items()}
 
@@ -113,8 +117,17 @@ SNAP_PREFERENCE = ("0900", "0930", "1030", "1330")
 #: to its first decision) covers 09:00(D-1) -> 09:00(D), so the default row is
 #: the trading day BEFORE D (lag 1).  stat_arb's ledger already books P&L on
 #: the realisation date (row D = morning TWAP D-1 -> morning TWAP D), lag 0.
+#: fpe's row D is 09:00(D-1) -> 09:00(D), end-dated the same way, lag 0.
+#: ks_outright's deployed summary.csv is start-dated like the others, lag 1.
 DEFAULT_BT_ROW_LAG = 1
-BT_ROW_LAG = {"stat_arb": 0}
+BT_ROW_LAG = {"stat_arb": 0, "fpe": 0}
+
+#: From this day on a forward day's expected uses the PREVIOUS day's weights:
+#: the row explaining day D was earned by the book set the day before, so an
+#: entry or exit day is priced at the weight actually held. Earlier days keep
+#: the same-day weight they were reported on (applying this to all history
+#: would restate ks_ext 09-01, stat_arb 09-02/03 and agri 11-02).
+PRIOR_DAY_WEIGHTS_FROM = "2026-11-11"
 
 #: |residual| alert threshold: max(RESID_ABS_FLOOR, RESID_REL * |live_gross|).
 RESID_ABS_FLOOR = 500.0

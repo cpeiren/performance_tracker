@@ -146,3 +146,35 @@ def test_bench_prices_take_the_earliest_snap_per_ticker(monkeypatch):
     monkeypatch.setattr(io_live, "fund_prices", lambda day: {"MA701": 2890.0, "CF701": 16800.0})
     b = io_live.bench_prices("2026-09-04")
     assert b == {"rb2701": 100.0, "IF2609": 4500.0, "MA701": 2900.0, "CF701": 16800.0}
+
+
+def test_prior_day_weights_price_entry_days_from_the_gate_on(monkeypatch):
+    days = ["2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12"]
+    bt = pd.DataFrame({"ks_branch": [10.0, 20.0, 30.0, 40.0], "fpe": [1.0, 2.0, 3.0, 4.0],
+                       "ks_outright": [5.0, 6.0, 7.0, 8.0]}, index=days)
+    bt.index.name = "date"
+    monkeypatch.setattr(C, "LIVE_START", "2026-11-10")
+    monkeypatch.setattr(C, "PRIOR_DAY_WEIGHTS_FROM", "2026-11-11")
+    before = {"ks_branch": 0.8}
+    after = {"ks_branch": 0.8, "fpe": 0.1, "ks_outright": 0.5}
+    w = {"2026-11-09": before, "2026-11-10": before, "2026-11-11": after, "2026-11-12": after}
+    out, problems, incomplete = R.weighted_bt(bt, {d: True for d in days}, w)
+    assert problems == [] and incomplete == {}
+    # entry day: the books were not held over the row that explains it
+    assert out.at["2026-11-11", "fpe"] == 0.0
+    assert out.at["2026-11-11", "ks_outright"] == 0.0
+    assert out.at["2026-11-11", "ks_branch"] == pytest.approx(0.8 * 20.0)
+    # next day: fpe row of that day (lag 0), ks_outright the row before (lag 1)
+    assert out.at["2026-11-12", "fpe"] == pytest.approx(0.1 * 4.0)
+    assert out.at["2026-11-12", "ks_outright"] == pytest.approx(0.5 * 7.0)
+
+
+def test_days_before_the_gate_keep_the_same_day_weight(monkeypatch):
+    days = ["2026-10-30", "2026-11-02", "2026-11-03"]
+    bt = pd.DataFrame({"agri_event": [10.0, 20.0, 30.0]}, index=days)
+    bt.index.name = "date"
+    monkeypatch.setattr(C, "LIVE_START", "2026-10-30")
+    monkeypatch.setattr(C, "PRIOR_DAY_WEIGHTS_FROM", "2026-11-11")
+    w = {"2026-10-30": {"agri_event": 1.0}, "2026-11-02": {"agri_event": 0.0}, "2026-11-03": {"agri_event": 0.0}}
+    out, _, _ = R.weighted_bt(bt, {d: True for d in days}, w)
+    assert out.at["2026-11-02", "agri_event"] == 0.0              # as reported at the time

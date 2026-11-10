@@ -43,7 +43,8 @@ def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame
                           f"shipped -- per-strategy attribution is empty; run "
                           f"the ship script.")
         else:
-            missing_src = [k for k in C.STRATEGIES if k not in books]
+            w, _ = io_backtest.weights_for_day(last_fwd, weights_hist or {})
+            missing_src = [k for k in C.STRATEGIES if (w or {}).get(k) and k not in books]
             if missing_src:
                 alerts.append(f"FORWARD BOOKS {last_fwd}: missing component "
                               f"book(s) {', '.join(missing_src)}.")

@@ -310,8 +310,9 @@ def weighted_bt(bt: pd.DataFrame, forward_flags: dict[str, bool],
     live day -- the previous row for every 09:00 -> 09:00 series, the day's
     own row for stat_arb.  Legacy days weight ks_branch + fund_v3 at 1 and
     everything else 0 (the account traded those two books unweighted).
-    Forward days use the day's shipped merge weights, carrying the latest
-    earlier day's forward when the day's own are not shipped yet.
+    Forward days use the day's shipped merge weights (the previous day's from
+    C.PRIOR_DAY_WEIGHTS_FROM on), carrying the latest earlier day's forward
+    when the wanted day's are not shipped yet.
 
     A strategy with nonzero weight but NO mature backtest row has an
     UNKNOWN expected that day, not a zero one: its cell is NaN and the day
@@ -334,7 +335,8 @@ def weighted_bt(bt: pd.DataFrame, forward_flags: dict[str, bool],
     for d in days:
         pos = all_days.index(d)
         if forward_flags.get(d):
-            w, exact = io_backtest.weights_for_day(d, weights_hist)
+            wd = all_days[pos - 1] if d >= C.PRIOR_DAY_WEIGHTS_FROM and pos > 0 else d
+            w, exact = io_backtest.weights_for_day(wd, weights_hist)
             if w is None:
                 w = C.LEGACY_BRIDGE_WEIGHTS
                 problems.append(
