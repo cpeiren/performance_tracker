@@ -35,9 +35,10 @@ RECON_CSV = DATA / "reconciliation.csv"
 STATE_JSON = DATA / "state.json"
 REPORT_DIR = TRACKER_ROOT / "reports"
 DAILY_DIR = REPORT_DIR / "daily"
+WEEKLY_DIR = REPORT_DIR / "weekly"
 
 for _d in (INCOMING, BACKTEST_DIR, VINTAGE_DIR, FORWARD_BOOKS_DIR, FORWARD_WEIGHTS_DIR,
-           DAILY_DIR):
+           DAILY_DIR, WEEKLY_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
 # --------------------------------------------------------------------------
@@ -87,6 +88,23 @@ FORWARD_SRC_TO_STRATEGY = {
     "ksoutright":  "ks_outright",
 }
 STRATEGY_TO_FORWARD_SRC = {v: k for k, v in FORWARD_SRC_TO_STRATEGY.items()}
+
+#: Product root -> sector, for the weekly summary.  A root missing here is
+#: reported under "other" and named in the report, so a new product shows up
+#: rather than silently landing in the wrong bucket.
+SECTORS = {
+    "energy":       ("sc", "fu", "lu", "bu", "pg"),
+    "petchem":      ("TA", "PX", "PF", "PR", "eg", "eb", "MA", "pp", "l", "v", "br"),
+    "chem/build":   ("SA", "FG", "SH", "UR", "lg"),
+    "ferrous":      ("i", "rb", "hc", "SF", "SM", "ss", "j", "jm", "wr"),
+    "nonferrous":   ("cu", "al", "zn", "pb", "ni", "sn", "ao", "si", "lc", "ps",
+                     "bc", "ag", "au"),
+    "oilseeds":     ("a", "b", "m", "y", "p", "OI", "RM", "PK"),
+    "grains/live":  ("c", "cs", "lh", "jd", "rr", "WH", "RI"),
+    "softs":        ("CF", "CY", "SR", "sp", "ru", "nr", "AP", "CJ"),
+    "financial":    ("IF", "IH", "IC", "IM", "T", "TF", "TS", "TL"),
+}
+PRODUCT_SECTOR = {p: s for s, ps in SECTORS.items() for p in ps}
 
 #: Bridge weights on LEGACY days: the two per-source books traded at weight 1.
 LEGACY_BRIDGE_WEIGHTS = {"ks_branch": 1.0, "fund_v3": 1.0}

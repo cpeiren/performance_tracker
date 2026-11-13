@@ -79,3 +79,15 @@ box).
 Optional cron on the box (owner installs; report generation only -- publish
 still happens from the local session):
   15 9 * * 1-5 cd $HOME/performance_tracker && ./run_daily.sh >> run.log 2>&1
+
+Weekly summary (tracker/weekly.py, run_weekly.sh): a high-level read of the
+week -- book vs backtest, strategies (best/worst, gap vs backtest), sectors
+(config.SECTORS), sector x strategy, best/worst products with the strategy
+that drove each -- next to the prior week, 4 weeks and live-to-date.  Built
+only from the CSVs the daily run writes under data/; recomputes and writes
+nothing there, so it never consumes the daily run's once-only alerts.  Output:
+reports/weekly/<Friday>.md + reports/latest_weekly.md (published by
+daily_publish.sh with the rest of reports/).  Saturday cron (box clock is
+UTC; 01:00 UTC = 09:00 CST, after Friday's daily run):
+  0 1 * * 6 cd $HOME/performance_tracker && ./run_weekly.sh >> weekly.log 2>&1
+Backfill or rerun any week: ./run_weekly.sh --asof YYYY-MM-DD.
