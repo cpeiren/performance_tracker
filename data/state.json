@@ -2757,13 +2757,13 @@
     }
   },
   "last_run": {
-    "at": "2026-11-13T09:15:05+00:00",
+    "at": "2026-11-13T09:30:05+00:00",
     "bt_pending": {
       "2026-11-13": [
         "stat_arb"
       ]
     },
-    "n_alerts": 27,
+    "n_alerts": 24,
     "reconciled_through": "2026-11-13"
   },
   "missing_live_days": [
