@@ -1,28 +1,26 @@
-# Performance tracker - 2026-11-16   (reconciled through 2026-11-16)
+# Performance tracker - 2026-11-18   (reconciled through 2026-11-18)
 
 ## ALERTS
-- VINTAGE agri_event: 7 historical row(s) restated (net -1,750 CNY, cause data, commit 8f0b7b9) -- kept as vintages/agri_event/20261116091117_8f0b7b90cc1f.csv; the bridge keeps the as-shipped pins
-- VINTAGE fund_v3: 4 historical row(s) restated (net -11 CNY, cause data, commit 0712a04) -- kept as vintages/fund_v3/20261116091117_0712a0472bd7.csv; the bridge keeps the as-shipped pins
-- VINTAGE stat_arb: 3 historical row(s) restated (net -3,932 CNY, cause data, commit 9f7e9a7) -- kept as vintages/stat_arb/20261116091117_9f7e9a742805.csv; the bridge keeps the as-shipped pins
+- VINTAGE agri_event: 12 historical row(s) restated (net -4,300 CNY, cause data, commit 8f0b7b9) -- kept as vintages/agri_event/20261118090511_8f0b7b90cc1f.csv; the bridge keeps the as-shipped pins
+- VINTAGE fund_v3: 1 historical row(s) restated (net +1,950 CNY, cause data, commit 0712a04) -- kept as vintages/fund_v3/20261118090511_0712a0472bd7.csv; the bridge keeps the as-shipped pins
 - WEIGHTS 2026-10-09: day's own merge weights not shipped yet -- carried forward from an earlier day.
 - WEIGHTS 2026-10-16: day's own merge weights not shipped yet -- carried forward from an earlier day.
 - WEIGHTS 2026-10-22: day's own merge weights not shipped yet -- carried forward from an earlier day.
-- BT PENDING 2026-11-16: no mature backtest row for stat_arb (nonzero weight) -- day reconciled WITHOUT that sleeve's expected; its live P&L sits in bt_pending_live, not resid, until the rows ship.
+- BT PENDING 2026-11-18: no mature backtest row for stat_arb (nonzero weight) -- day reconciled WITHOUT that sleeve's expected; its live P&L sits in bt_pending_live, not resid, until the rows ship.
 - WEIGHTS CHANGE on 2026-09-01: ks_ext: 0.0->0.25.
 - WEIGHTS CHANGE on 2026-09-02: stat_arb: 1.0->0.0.
 - WEIGHTS CHANGE on 2026-09-03: stat_arb: 0.0->1.0.
 - WEIGHTS CHANGE on 2026-11-02: agri_event: 1.0->0.0.
 - WEIGHTS CHANGE on 2026-11-11: fpe: None->0.1, ks_outright: None->0.5.
-- BT REVISED vs PINS: fund_v3 current history differs from pinned as-shipped values on 3 new live-window day(s) (max |diff| 22683 CNY, first 2026-11-06); the bridge keeps the pins.
-- BT REVISED vs PINS: stat_arb current history differs from pinned as-shipped values on 2 new live-window day(s) (max |diff| 9982 CNY, first 2026-11-10); the bridge keeps the pins.
+- BT REVISED vs PINS: agri_event current history differs from pinned as-shipped values on 1 new live-window day(s) (max |diff| 7250 CNY, first 2026-10-28); the bridge keeps the pins.
 - MISSING LIVE DAY 2026-08-28: trading day with a backtest row but no daily_pnl/state file; excluded from the bridge, expected pnl held in the missing-day bucket.
 - SCALE 2026-08-28: no usable run record; previous scale carried forward.
 - SCALE 2026-09-25: no usable run record; previous scale carried forward.
 - SCALE CHANGE on 2026-08-27: now 0.2.
 - SCALE CHANGE on 2026-09-01: now 0.5.
 - SCALE CHANGE on 2026-09-09: now 1.
-- BACKTEST REVISED: agri_event -- 7 mature row(s) changed since last run (net -1750 CNY, largest 2026-04-30 +25440 -> +22940; first 2026-02-05, last 2026-05-06). Regeneration upstream; baseline re-set.
-- SLIPPAGE 2026-11-16: 8 unbenchmarked leg(s), +28 CNY exec cost without a shipped decision price.
+- BACKTEST REVISED: agri_event -- 9 mature row(s) changed since last run (net -5425 CNY, largest 2026-02-24 +50705 -> +47280; first 2026-02-06, last 2026-05-07). Regeneration upstream; baseline re-set.
+- SLIPPAGE 2026-11-18: 3 unbenchmarked leg(s), +1895 CNY exec cost without a shipped decision price.
 - RESIDUAL 2026-08-27: -17267 CNY vs trailing median |resid| 2062, offset by neither neighbour (2026-08-26 +3749, 2026-08-31 -17348) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
 - RESIDUAL 2026-08-31: -17348 CNY vs trailing median |resid| 2277, offset by neither neighbour (2026-08-27 -17267, 2026-09-01 -8190) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
 - RESIDUAL 2026-09-01: -8190 CNY vs trailing median |resid| 2492, offset by neither neighbour (2026-08-31 -17348, 2026-09-02 -30063) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
@@ -32,33 +30,31 @@
 - RESIDUAL 2026-10-26: +29017 CNY vs trailing median |resid| 7638, offset by neither neighbour (2026-10-23 +7825, 2026-10-27 +81673) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
 - RESIDUAL 2026-10-27: +81673 CNY vs trailing median |resid| 9046, offset by neither neighbour (2026-10-26 +29017, 2026-10-28 +2573) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
 
-## Latest reconciled day (2026-11-16, forward regime, PROVISIONAL: marked at the 16:00 close, re-marked to settlement after the next capture)
-live gross +155,750 | expected (1 x bt +84,372) = +84,372 | gap +71,378
-  exec_cost +14,938 (slip +14,910, unbench +28) | marking +95,595 | bookdiff +0 (carry +0, new +0) | intraday +0 | offbook +0 (0 contract(s)) | residual +12,541 (live re-marked to first decision, vs the previous backtest row)
-  PARTIAL: no backtest row yet for stat_arb -- expected excludes it; its live P&L -21,820 is held out of resid
-  fees +1,507 | broker residual +0 -> live net +154,243
+## Latest reconciled day (2026-11-18, forward regime, PROVISIONAL: marked at the 16:00 close, re-marked to settlement after the next capture)
+live gross +57,670 | expected (1 x bt -12,530) = -12,530 | gap +70,200
+  exec_cost -3,695 (slip -5,590, unbench +1,895) | marking +59,010 | bookdiff +0 (carry +0, new +0) | intraday +0 | offbook +0 (0 contract(s)) | residual -900 (live re-marked to first decision, vs the previous backtest row)
+  PARTIAL: no backtest row yet for stat_arb -- expected excludes it; its live P&L +8,395 is held out of resid
+  fees +1,444 | broker residual +0 -> live net +56,226
 
-## Cumulative bridge (live since 2026-08-18, 58 reconciled days, 1 with a sleeve's backtest pending)
+## Cumulative bridge (live since 2026-08-18, 60 reconciled days, 1 with a sleeve's backtest pending)
 | expected | -exec | +marking | +bookdiff | +intraday | +offbook | +bt pending | +resid | = live gross | -fees | +broker_resid | = live net |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| +727,281 | -95,458 | +84,300 | +90,047 | -6,568 | -50 | -21,820 | +16,832 | +794,565 | -59,532 | +11,124 | +746,157 |
+| +789,014 | -88,050 | +46,305 | +90,047 | -6,568 | -50 | +8,395 | -14,369 | +824,725 | -62,127 | +11,183 | +773,781 |
 missing live days excluded: 2026-08-28 (expected +4,849 held in bucket)
 
 ## Stats (daily CNY pnl)
 | window | days | total | sharpe | mdd | hit |
 |---|---|---|---|---|---|
-| live net live-to-date | 58 | +746,157 | 3.39 | -330,281 | 57% |
-| live net last-20d | 20 | +213,022 | 2.66 | -317,945 | 50% | (small sample)
-| live net 2026-YTD | 58 | +746,157 | 3.39 | -330,281 | 57% |
-| bt scaled live-to-date | 58 | +727,281 | 3.11 | -381,526 | 67% |
-| bt scaled last-20d | 20 | +90,455 | 0.97 | -381,526 | 60% | (small sample)
-| bt scaled 2026-YTD | 58 | +727,281 | 3.11 | -381,526 | 67% |
+| live net live-to-date | 60 | +773,781 | 3.54 | -330,281 | 58% |
+| live net last-20d | 20 | +210,402 | 2.84 | -317,945 | 55% | (small sample)
+| live net 2026-YTD | 60 | +773,781 | 3.54 | -330,281 | 58% |
+| bt scaled live-to-date | 60 | +789,014 | 3.29 | -381,526 | 67% |
+| bt scaled last-20d | 20 | +166,772 | 1.76 | -381,526 | 60% | (small sample)
+| bt scaled 2026-YTD | 60 | +789,014 | 3.29 | -381,526 | 67% |
 
 ## Slippage (+ = cost; bps vs benchmarked notional)
 | day | lots | notional M | slip total | drift | exec | bps | unbench legs | unbench CNY |
 |---|---|---|---|---|---|---|---|---|
-| 2026-11-03 | 379 | 25.3 | +7,160 | +5,542 | +1,618 | +2.94 | 2 | +2,140 |
-| 2026-11-04 | 364 | 32.1 | +2,030 | +1,422 | +608 | +0.64 | 1 | +275 |
 | 2026-11-05 | 462 | 30.3 | +3,350 | +942 | +2,408 | +1.15 | 4 | -45 |
 | 2026-11-06 | 863 | 42.1 | +13,755 | +6,750 | +7,005 | +3.27 | 1 | +45 |
 | 2026-11-09 | 519 | 27.4 | -5,690 | -6,638 | +948 | -2.09 | 1 | -30 |
@@ -67,52 +63,52 @@ missing live days excluded: 2026-08-28 (expected +4,849 held in bucket)
 | 2026-11-12 | 508 | 31.3 | +3,550 | +2,372 | +1,178 | +1.15 | 2 | -100 |
 | 2026-11-13 | 504 | 35.5 | +2,085 | -325 | +2,410 | +0.62 | 5 | +228 |
 | 2026-11-16 | 540 | 42.9 | +14,910 | +13,128 | +1,782 | +3.92 | 8 | +28 |
-| live window (58d) | 22454 | 1404.8 | +79,565 | +9,722 | +69,842 | +0.61 | 271 | +15,892 |
-exec-only bps over the window: +0.53; benchmark coverage 93% of traded notional
+| 2026-11-17 | 436 | 22.5 | -3,665 | -7,090 | +3,425 | -1.67 | 4 | -48 |
+| 2026-11-18 | 689 | 27.1 | -5,590 | -6,510 | +920 | -2.45 | 3 | +1,895 |
+| live window (60d) | 23579 | 1454.5 | +70,310 | -3,878 | +74,188 | +0.52 | 278 | +17,740 |
+exec-only bps over the window: +0.55; benchmark coverage 93% of traded notional
 
 | product | days | lots | notional M | drift | exec (incl. unbench) | all-in | bps |
 |---|---|---|---|---|---|---|---|
-| IH | 38 | 158 | 131.1 | -26,310 | +5,670 | -20,640 | -1.57 |
-| CY | 44 | 323 | 35.5 | +14,625 | +5,950 | +20,575 | +5.80 |
+| pg | 31 | 60 | 8.0 | +21,570 | +150 | +21,720 | +27.25 |
+| IH | 39 | 160 | 132.8 | -26,850 | +5,790 | -21,060 | -1.59 |
+| CY | 45 | 339 | 37.1 | +11,925 | +6,150 | +18,075 | +4.87 |
 | IF | 25 | 86 | 109.3 | -20,340 | +3,300 | -17,040 | -1.56 |
-| pg | 29 | 50 | 6.8 | +16,300 | +160 | +16,460 | +24.20 |
-| y | 48 | 327 | 29.1 | +9,940 | +2,130 | +12,070 | +4.15 |
-| rb | 47 | 1540 | 47.5 | +9,930 | +1,790 | +11,720 | +2.47 |
-| bu | 50 | 595 | 28.1 | -13,120 | +1,515 | -11,605 | -4.13 |
-| SA | 54 | 861 | 17.3 | +6,780 | +3,260 | +10,040 | +5.79 |
-| al | 45 | 736 | 85.4 | +6,825 | +3,125 | +9,950 | +1.17 |
+| al | 47 | 741 | 85.9 | +11,888 | +3,088 | +14,975 | +1.74 |
+| y | 50 | 354 | 31.4 | +11,870 | +2,470 | +14,340 | +4.57 |
+| bu | 52 | 610 | 28.7 | -13,675 | +1,510 | -12,165 | -4.24 |
+| cu | 25 | 115 | 62.3 | -12,125 | +475 | -11,650 | -1.87 |
+| SA | 56 | 913 | 18.3 | +7,520 | +3,160 | +10,680 | +5.82 |
+| rb | 49 | 1829 | 56.1 | +6,840 | +3,215 | +10,055 | +1.79 |
 | SF | 54 | 589 | 17.6 | +8,850 | +995 | +9,845 | +5.61 |
-| FG | 57 | 1113 | 20.1 | +2,650 | +6,110 | +8,760 | +4.36 |
-| SR | 52 | 1036 | 55.8 | +5,845 | +1,990 | +7,835 | +1.40 |
-| PF | 49 | 336 | 13.7 | -8,615 | +810 | -7,805 | -5.70 |
-| a | 53 | 650 | 34.2 | +3,850 | +3,485 | +7,335 | +2.14 |
-| pb | 47 | 1059 | 84.9 | +1,950 | +4,738 | +6,688 | +0.79 |
-| other (38) | - | 12995 | 688.5 | -9,438 | +40,708 | +31,270 | +0.45 |
-| all products | - | 22454 | 1404.8 | +9,722 | +85,735 | +95,458 | +0.68 |
+| FG | 59 | 1187 | 21.4 | +2,010 | +7,130 | +9,140 | +4.27 |
+| SR | 54 | 1059 | 57.0 | +6,640 | +2,005 | +8,645 | +1.52 |
+| pb | 49 | 1098 | 87.9 | +2,662 | +5,112 | +7,775 | +0.88 |
+| PF | 51 | 351 | 14.3 | -8,190 | +995 | -7,195 | -5.04 |
+| other (39) | - | 14088 | 686.4 | -14,472 | +46,382 | +31,910 | +0.46 |
+| all products | - | 23579 | 1454.5 | -3,878 | +91,928 | +88,050 | +0.61 |
 ranked by |all-in| over the live window (all-in = drift + exec = the bridge's exec_cost by product); product bps are vs traded notional
 
 ## Per strategy
 | strategy | live? | bt 2026 pnl (full) | bt scaled+weighted (live window) | live attributed | note |
 |---|---|---|---|---|---|
-| Calendar main pool (branch) | yes | +1,151,620 | +119,152 | +171,799 | forward w=0.8 |
-| Fundamental factor | yes | +894,491 | +522,094 | +517,275 | forward w=2 |
-| Cross-product pairs | yes | +74,345 | +25,418 | +4,908 | forward w=1.5 |
-| Calendar extended pool | yes | +505,485 | +17,137 | +60,345 | forward w=0.25 |
-| Chemical fundamental | yes | +500,410 | +29,696 | -20,494 | forward w=1.5 |
-| Agriculture event-driven | no | +39,710 | -111,243 | -152,798 | forward w=0 (parked) |
-| Factor-neutral stat arb | yes | +338,986 | +32,859 | +38,024 | forward w=1 |
-| Fund pipeline ensemble | yes | +2,855,665 | +68,888 | +81,242 | forward w=0.1 |
-| Outright trend + basis | yes | +561,990 | +23,280 | +24,135 | forward w=0.5 |
+| Calendar main pool (branch) | yes | +1,185,555 | +146,300 | +156,399 | forward w=0.8 |
+| Fundamental factor | yes | +916,770 | +566,594 | +598,805 | forward w=2 |
+| Cross-product pairs | yes | +73,980 | +24,871 | +10,818 | forward w=1.5 |
+| Calendar extended pool | yes | +507,935 | +17,749 | +64,165 | forward w=0.25 |
+| Chemical fundamental | yes | +500,595 | +29,973 | -51,514 | forward w=1.5 |
+| Agriculture event-driven | no | +20,310 | -111,243 | -152,798 | forward w=0 (parked) |
+| Factor-neutral stat arb | yes | +320,475 | +14,348 | +45,564 | forward w=1 |
+| Fund pipeline ensemble | yes | +3,191,208 | +102,442 | +101,166 | forward w=0.1 |
+| Outright trend + basis | yes | +511,390 | -2,020 | -4,690 | forward w=0.5 |
 | shared bucket | - | - | - | +3,575 | legacy days only: a contract both per-source books held |
 | neither bucket (no target) | - | - | - | +2,585 | named by no book that day or the day before |
-| trading bucket | - | - | - | +63,970 | forward days: live P&L minus the strategies' holdings (fills vs settlement on rebalances, lot rounding, scale changes) |
+| trading bucket | - | - | - | +50,650 | forward days: live P&L minus the strategies' holdings (fills vs settlement on rebalances, lot rounding, scale changes) |
 forward days: each strategy is its own previous-day weighted book x scale x the settlement-to-settlement move (holdings); legacy days remain exclusive-holder. The gap tables (attributed - expected) therefore exclude execution, which sits in trading.
 
 ## Live P&L by strategy, last 10 reconciled days (attributed gross CNY)
 | day | ks_branch | fund_v3 | china_pairs | ks_ext | chem_fund | agri_event | stat_arb | fpe | ks_outright | shared | neither | trading | total |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 2026-11-03 | -9,816 | +21,940 | -8,490 | -123 | -13,485 | +0 | +1,335 | +0 | +0 | +0 | +0 | +2,793 | -5,845 |
-| 2026-11-04 | +7,320 | -21,410 | -2,842 | -13,680 | +11,618 | +0 | +12,140 | +0 | +0 | +0 | +0 | +4,875 | -1,980 |
 | 2026-11-05 | -33,388 | +1,260 | -532 | +8,112 | -8,992 | +0 | +12,415 | +0 | +0 | +0 | +0 | -13,885 | -35,010 |
 | 2026-11-06 | +316 | -2,180 | +21,278 | +4,886 | -10,478 | +0 | -8,320 | +0 | +0 | +0 | +0 | +6,048 | +11,550 |
 | 2026-11-09 | -224 | +21,420 | +11,745 | -3,271 | -4,425 | +0 | -745 | +0 | +0 | +0 | +0 | +4,255 | +28,755 |
@@ -120,15 +116,15 @@ forward days: each strategy is its own previous-day weighted book x scale x the 
 | 2026-11-11 | -48 | +81,680 | +7,920 | -1,788 | -14,685 | +0 | +7,710 | +0 | +0 | +0 | +0 | +7,396 | +88,185 |
 | 2026-11-12 | +57,280 | +15,540 | -5,798 | -3,425 | +975 | +0 | -5,505 | +30,757 | +8,365 | +0 | +255 | -1,640 | +96,805 |
 | 2026-11-13 | +25,720 | +17,270 | +1,598 | -6,845 | -652 | +0 | +5,150 | +20,356 | +14,980 | +0 | +0 | +12,519 | +90,095 |
-| 2026-11-16 | +47,440 | +65,330 | +562 | +3,262 | +12,878 | +0 | -21,820 | +30,129 | +790 | +0 | +0 | +17,179 | +155,750 |
-| sum | +104,660 | +261,140 | +19,898 | -8,609 | -66,338 | +0 | -6,225 | +81,242 | +24,135 | +0 | +255 | +41,422 | +451,580 |
+| 2026-11-16 | +42,372 | +44,060 | -4,905 | +3,780 | +9,698 | +0 | -9,495 | +21,178 | +3,188 | +0 | +0 | -7,000 | +102,875 |
+| 2026-11-17 | +40,840 | +8,880 | -6,218 | -1,909 | -3,375 | +0 | -13,180 | +12,305 | -15,038 | +0 | +0 | +3,059 | +25,365 |
+| 2026-11-18 | -51,172 | +93,920 | +17,595 | +5,211 | -24,465 | +0 | +8,395 | +16,571 | -16,185 | +0 | +0 | +7,800 | +57,670 |
+| sum | +91,756 | +342,140 | +37,140 | +9,014 | -95,490 | +0 | -12,160 | +101,166 | -4,690 | +0 | +255 | +20,434 | +489,565 |
 forward days: previous-day weighted book x scale x settlement move per strategy, the rest in trading; total foots to live gross. Live-window sums: 'Per strategy' above; full series: data/per_strategy_daily.csv (attributed)
 
 ## Per strategy gap by day, last 10 reconciled days (live attributed - expected, CNY)
 | day | ks_branch | fund_v3 | china_pairs | ks_ext | chem_fund | agri_event | stat_arb | fpe | ks_outright | total |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 2026-11-03 | -18,168 | -12,215 | -1,110 | +13,477 | -7,695 | +0 | +3,215 | +0 | +0 | -22,496 |
-| 2026-11-04 | +2,600 | -42,652 | -6,390 | -17,409 | -240 | +0 | +12,722 | +0 | +0 | -51,368 |
 | 2026-11-05 | -20,828 | -38,627 | +5,752 | +2,836 | +1,545 | +0 | +26,370 | +0 | +0 | -22,951 |
 | 2026-11-06 | +16,056 | +9,255 | -3,420 | +208 | -16,882 | +0 | -4,371 | +0 | +0 | +845 |
 | 2026-11-09 | -3,548 | +39,923 | -5,205 | +4,985 | +3,098 | +0 | -4,969 | +0 | +0 | +34,284 |
@@ -136,66 +132,68 @@ forward days: previous-day weighted book x scale x settlement move per strategy,
 | 2026-11-11 | +13,352 | -41,720 | +892 | -9,048 | -22,582 | +0 | -5,842 | +0 | +0 | -64,948 |
 | 2026-11-12 | +26,396 | +1,299 | +390 | -855 | +18,465 | +0 | +840 | +17,117 | +5,348 | +69,000 |
 | 2026-11-13 | -40,452 | +8,720 | +2,962 | -7,659 | -14,955 | +0 | +4,729 | -14,154 | -4,085 | -64,893 |
-| 2026-11-16 | +37,412 | +5,013 | +5,220 | +1,961 | +17,430 | +0 | - | +9,391 | -408 | +76,020 |
-| sum | -5,876 | -30,527 | -38 | -13,185 | -32,280 | +0 | +29,178 | +12,354 | +855 | -39,519 |
+| 2026-11-16 | +32,344 | -15,894 | -248 | +2,479 | +13,995 | +0 | -12,710 | +440 | +1,990 | +22,396 |
+| 2026-11-17 | -26,696 | -22,456 | -5,460 | -224 | +4,868 | +0 | +8,546 | -7,176 | -252 | -48,850 |
+| 2026-11-18 | -10,784 | +80,394 | +17,385 | +2,914 | -32,730 | +0 | - | +2,497 | -5,670 | +54,005 |
+| sum | -32,856 | +61,371 | +13,920 | -6,046 | -55,642 | +0 | +9,076 | -1,276 | -2,670 | -14,123 |
 full series: data/per_strategy_daily.csv (day, strategy, expected, attributed, gap); a strategy's daily total foots to expected - live_gross once the shared, neither and trading buckets are added. '-' = that sleeve's backtest row has not shipped yet (BT PENDING).
 
 ## Live P&L by product, last 10 reconciled days (gross CNY, worst first)
-| product | 11-03 | 11-04 | 11-05 | 11-06 | 11-09 | 11-10 | 11-11 | 11-12 | 11-13 | 11-16 | 10d sum | live window |
+| product | 11-05 | 11-06 | 11-09 | 11-10 | 11-11 | 11-12 | 11-13 | 11-16 | 11-17 | 11-18 | 10d sum | live window |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| TA | -42,080 | -9,440 | -44,250 | -5,800 | +4,200 | -10,140 | +140 | +930 | +2,300 | -10 | -104,150 | -71,260 |
-| y | -25,520 | -29,090 | -8,710 | -12,240 | -7,260 | -1,200 | +8,330 | +4,870 | +2,490 | -540 | -68,870 | -108,100 |
-| pp | -14,870 | -2,660 | -17,820 | +955 | -11,905 | -37,895 | -560 | +9,640 | +13,050 | -3,045 | -65,110 | -84,390 |
-| a | -6,810 | -12,270 | +5,100 | -5,410 | +5,480 | +1,700 | +3,830 | +140 | -5,620 | -32,130 | -45,990 | -28,340 |
-| eb | -19,680 | -5,700 | -12,610 | -3,905 | -2,700 | -6,390 | +745 | +2,810 | +5,685 | +7,090 | -34,655 | +34,570 |
-| MA | -12,150 | -3,700 | -11,620 | -5,080 | -1,850 | -4,400 | +1,240 | +1,950 | +2,220 | +930 | -32,460 | +10,580 |
-| br | -5,350 | -300 | -8,350 | -2,750 | +1,150 | -2,350 | -400 | -950 | -3,200 | -4,300 | -26,800 | -24,975 |
-| c | +1,050 | -1,880 | +4,280 | -2,560 | +2,470 | -13,550 | -5,180 | -2,210 | -4,200 | +1,900 | -19,880 | -36,320 |
-| ru | +1,200 | -5,800 | -900 | -450 | +500 | -2,600 | -1,800 | -2,250 | -4,300 | -300 | -16,700 | -16,850 |
-| rb | +16,450 | +4,400 | -17,450 | -5,660 | -2,340 | -7,540 | +12,660 | -11,320 | +10,320 | -16,080 | -16,560 | +111,490 |
-| pg | -7,040 | -2,980 | -8,020 | -7,720 | +3,480 | +8,740 | -260 | +400 | +140 | +3,260 | -10,000 | -37,200 |
-| FG | -5,880 | -6,200 | -5,700 | +720 | -8,160 | -5,320 | +4,100 | +9,820 | +25,820 | -18,920 | -9,720 | +79,740 |
-| IF | +3,420 | -15,000 | +900 | -540 | +1,320 | -240 | -120 | +720 | +3,480 | -840 | -6,900 | -62,100 |
-| j | +0 | +50 | -1,950 | +0 | +0 | +0 | +900 | -3,000 | +0 | -600 | -4,600 | +1,550 |
-| lh | +0 | +0 | +0 | +0 | +0 | +0 | -880 | -240 | -2,480 | +720 | -2,880 | +21,120 |
-| other (28) | +68,460 | +57,615 | +21,885 | +13,775 | +15,350 | +17,825 | +17,715 | +13,300 | -12,210 | +23,695 | +237,410 | +244,185 |
-| m | +90 | +5,870 | +3,880 | +6,680 | +6,660 | +12,590 | -7,690 | +6,060 | -3,220 | +3,000 | +33,920 | +8,020 |
-| eg | +13,720 | +2,050 | +26,680 | +4,990 | -1,340 | +3,920 | -1,800 | -3,920 | -3,870 | -780 | +39,650 | +42,740 |
-| PF | +23,910 | +2,570 | +13,630 | +3,580 | -2,250 | -1,980 | -570 | +850 | +530 | +630 | +40,900 | +83,130 |
-| cs | -1,060 | -3,440 | -13,080 | +2,940 | -11,790 | +23,800 | +22,430 | +8,100 | +9,940 | +12,900 | +50,740 | +158,210 |
-| fu | +9,400 | +11,500 | +21,060 | +1,620 | +3,490 | -2,650 | -2,080 | +2,360 | +5,420 | +5,590 | +55,710 | +69,440 |
-| cu | -5,000 | +19,650 | -1,600 | +11,150 | -2,400 | -5,300 | +8,600 | +1,150 | +5,900 | +27,600 | +59,750 | +42,000 |
-| hc | -9,690 | +750 | +19,770 | +3,300 | +5,630 | +7,780 | +1,710 | +9,190 | -1,820 | +24,710 | +61,330 | -100,650 |
-| i | +4,900 | -6,950 | -12,250 | -3,700 | +4,000 | -3,550 | +5,100 | +8,750 | +7,350 | +65,200 | +68,850 | +72,200 |
-| l | +12,460 | -4,500 | +14,790 | +25,555 | +3,770 | +16,200 | +1,975 | -745 | -1,780 | +2,795 | +70,520 | +66,700 |
-| al | -5,775 | +3,475 | -2,675 | -7,900 | +23,250 | +35,825 | +20,050 | +40,400 | +38,150 | +53,275 | +198,075 | +319,075 |
-| all products | -5,845 | -1,980 | -35,010 | +11,550 | +28,755 | +23,275 | +88,185 | +96,805 | +90,095 | +155,750 | +451,580 | +794,565 |
+| pp | -17,820 | +955 | -11,905 | -37,895 | -560 | +9,640 | +13,050 | -85 | -12,865 | -27,020 | -84,505 | -121,315 |
+| rb | -17,450 | -5,660 | -2,340 | -7,540 | +12,660 | -11,320 | +10,320 | -11,240 | -49,560 | +9,950 | -72,180 | +76,720 |
+| TA | -44,250 | -5,800 | +4,200 | -10,140 | +140 | +930 | +2,300 | +180 | -3,060 | -1,330 | -56,830 | -75,460 |
+| eb | -12,610 | -3,905 | -2,700 | -6,390 | +745 | +2,810 | +5,685 | +2,310 | -12,620 | -15,925 | -42,600 | +1,245 |
+| y | -8,710 | -12,240 | -7,260 | -1,200 | +8,330 | +4,870 | +2,490 | +1,830 | -16,100 | -13,710 | -41,700 | -135,540 |
+| a | +5,100 | -5,410 | +5,480 | +1,700 | +3,830 | +140 | -5,620 | -23,390 | -8,070 | -470 | -26,710 | -28,140 |
+| MA | -11,620 | -5,080 | -1,850 | -4,400 | +1,240 | +1,950 | +2,220 | +1,350 | -910 | -6,270 | -23,370 | +3,820 |
+| ni | -10,520 | -9,800 | -1,020 | +3,290 | +5,880 | -4,020 | -830 | +10,800 | +5,010 | -15,200 | -16,410 | -29,330 |
+| j | -1,950 | +0 | +0 | +0 | +900 | -3,000 | +0 | -350 | +4,750 | -15,900 | -15,550 | -9,350 |
+| c | +4,280 | -2,560 | +2,470 | -13,550 | -5,180 | -2,210 | -4,200 | +1,030 | +1,790 | +2,870 | -15,260 | -32,530 |
+| br | -8,350 | -2,750 | +1,150 | -2,350 | -400 | -950 | -3,200 | -4,400 | +4,450 | +1,900 | -14,900 | -18,725 |
+| sp | -5,160 | -2,860 | +420 | +1,820 | -5,860 | +2,020 | +760 | +5,880 | -5,400 | -320 | -8,700 | +30,440 |
+| ru | -900 | -450 | +500 | -2,600 | -1,800 | -2,250 | -4,300 | -1,550 | +2,900 | +3,050 | -7,400 | -12,150 |
+| SF | -1,530 | +2,490 | -2,330 | -4,940 | -670 | +1,720 | -6,230 | -3,820 | +8,830 | +1,250 | -5,230 | +29,560 |
+| FG | -5,700 | +720 | -8,160 | -5,320 | +4,100 | +9,820 | +25,820 | -6,600 | -21,140 | +3,980 | -2,480 | +74,900 |
+| other (29) | +77,235 | +20,410 | +15,550 | +10,025 | +13,090 | +17,790 | +9,890 | +14,580 | -1,230 | +62,615 | +239,955 | +284,455 |
+| SR | -5,280 | +9,350 | +2,060 | +190 | +4,590 | +1,600 | +340 | +2,170 | -5,280 | +20,770 | +30,510 | +97,770 |
+| m | +3,880 | +6,680 | +6,660 | +12,590 | -7,690 | +6,060 | -3,220 | +670 | +8,660 | -1,250 | +33,040 | +13,100 |
+| jm | +0 | +0 | +0 | +0 | +0 | +0 | +0 | +0 | -2,520 | +39,360 | +36,840 | +36,840 |
+| v | +21,390 | -3,885 | +5,370 | +15,230 | -5,025 | -5,640 | -12,920 | -6,025 | +15,170 | +15,560 | +39,225 | +41,505 |
+| cs | -13,080 | +2,940 | -11,790 | +23,800 | +22,430 | +8,100 | +9,940 | +5,590 | +7,700 | -1,170 | +54,460 | +157,430 |
+| l | +14,790 | +25,555 | +3,770 | +16,200 | +1,975 | -745 | -1,780 | +170 | +6,185 | -200 | +65,920 | +70,060 |
+| cu | -1,600 | +11,150 | -2,400 | -5,300 | +8,600 | +1,150 | +5,900 | +23,800 | +2,300 | +27,250 | +70,850 | +67,750 |
+| i | -12,250 | -3,700 | +4,000 | -3,550 | +5,100 | +8,750 | +7,350 | +40,900 | +34,300 | +1,600 | +82,500 | +83,800 |
+| hc | +19,770 | +3,300 | +5,630 | +7,780 | +1,710 | +9,190 | -1,820 | +11,350 | +47,900 | +7,130 | +111,940 | -58,980 |
+| al | -2,675 | -7,900 | +23,250 | +35,825 | +20,050 | +40,400 | +38,150 | +37,725 | +14,175 | -40,850 | +158,150 | +276,850 |
+| all products | -35,010 | +11,550 | +28,755 | +23,275 | +88,185 | +96,805 | +90,095 | +102,875 | +25,365 | +57,670 | +489,565 | +824,725 |
 executor total_pnl (holding + trading, settlement-to-settlement once the next capture lands, before fees) summed by product root; 'all products' foots to live gross. Full series: data/product_daily.csv
 
 ## Worst (strategy, product) cells, last 10 reconciled days (attributed gross CNY)
-| strategy | product | 11-03 | 11-04 | 11-05 | 11-06 | 11-09 | 11-10 | 11-11 | 11-12 | 11-13 | 11-16 | sum |
+| strategy | product | 11-05 | 11-06 | 11-09 | 11-10 | 11-11 | 11-12 | 11-13 | 11-16 | 11-17 | 11-18 | sum |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| china_pairs | pp | -18,322 | -3,098 | -16,380 | -20,700 | -2,362 | -30,772 | -742 | +7,155 | +8,032 | -4,320 | -81,510 |
-| china_pairs | rb | +14,280 | +2,520 | -21,855 | -7,755 | -1,290 | -3,870 | +6,120 | -9,600 | +2,400 | -22,800 | -41,850 |
-| china_pairs | TA | -15,360 | -4,050 | -19,305 | -1,485 | +2,520 | -5,550 | -375 | +2,025 | +3,825 | -1,425 | -39,180 |
-| fund_v3 | eb | -18,620 | -6,840 | -10,980 | -4,000 | -5,850 | -9,570 | +1,020 | +3,810 | +6,390 | +7,070 | -37,570 |
-| china_pairs | y | -15,660 | -16,065 | -5,130 | -7,455 | -4,920 | -240 | +6,600 | +5,280 | +720 | -630 | -37,500 |
-| fund_v3 | TA | -17,320 | -3,100 | -11,500 | -1,240 | +0 | +1,420 | +360 | -1,140 | -2,560 | +720 | -34,360 |
-| stat_arb | pg | -7,040 | -2,980 | -8,020 | -5,640 | -2,440 | -6,380 | -60 | +360 | +980 | +0 | -31,220 |
-| chem_fund | TA | -9,525 | -2,265 | -10,305 | -1,455 | +2,010 | -5,505 | -435 | +285 | +960 | +15 | -26,220 |
-| stat_arb | l | -6,725 | +310 | -2,960 | -5,160 | -1,365 | -7,275 | -850 | +630 | +2,250 | -2,130 | -23,275 |
-| ks_ext | IF | +1,590 | -15,795 | +255 | -4,635 | +1,455 | -135 | +75 | -2,580 | -1,695 | -1,365 | -22,830 |
-| chem_fund | pp | -2,468 | -338 | -5,692 | -5,130 | -4,762 | -16,830 | +1,530 | +3,330 | +7,110 | +795 | -22,455 |
-| ks_branch | pp | -6,564 | -1,644 | -6,552 | +7,924 | -6,280 | -6,044 | -676 | +88 | -1,100 | -880 | -21,728 |
-| fund_v3 | c | -100 | -1,360 | +3,340 | -2,840 | +2,000 | -11,520 | -4,980 | -1,260 | -3,020 | -1,920 | -21,660 |
-| ks_branch | bu | -6,664 | -1,560 | -9,608 | -1,456 | +1,408 | -1,976 | -672 | +64 | +16 | +64 | -20,384 |
-| fund_v3 | y | -6,960 | -7,380 | -2,160 | -1,720 | +2,460 | -40 | +0 | -2,060 | -660 | +0 | -18,520 |
+| china_pairs | rb | -21,855 | -7,755 | -1,290 | -3,870 | +6,120 | -9,600 | +2,400 | -13,200 | -52,800 | -1,365 | -103,215 |
+| china_pairs | pp | -16,380 | -20,700 | -2,362 | -30,772 | -742 | +7,155 | +8,032 | +270 | -15,060 | -15,600 | -86,160 |
+| fund_v3 | eb | -10,980 | -4,000 | -5,850 | -9,570 | +1,020 | +3,810 | +6,390 | +3,080 | -8,970 | -13,080 | -38,150 |
+| china_pairs | y | -5,130 | -7,455 | -4,920 | -240 | +6,600 | +5,280 | +720 | +1,155 | -13,545 | -16,200 | -33,735 |
+| chem_fund | pp | -5,692 | -5,130 | -4,762 | -16,830 | +1,530 | +3,330 | +7,110 | +2,175 | -2,640 | -11,760 | -32,670 |
+| china_pairs | TA | -19,305 | -1,485 | +2,520 | -5,550 | -375 | +2,025 | +3,825 | -1,125 | -4,350 | -6,825 | -30,645 |
+| stat_arb | l | -2,960 | -5,160 | -1,365 | -7,275 | -850 | +630 | +2,250 | +480 | -7,110 | -6,570 | -27,930 |
+| trading | cu | +140 | +530 | +0 | +0 | +2,100 | -1,010 | +730 | +385 | +395 | -30,065 | -26,795 |
+| chem_fund | bu | -3,840 | -1,020 | -4,050 | -8,115 | -3,720 | +2,820 | +5,370 | +600 | -7,095 | -4,830 | -23,880 |
+| fund_v3 | p | -5,160 | -4,100 | -4,600 | -1,620 | +6,920 | +4,960 | +1,760 | +3,440 | -9,940 | -15,400 | -23,740 |
+| fpe | j | +0 | +0 | +0 | +0 | +0 | -1,800 | +0 | +0 | +0 | -19,800 | -21,600 |
+| stat_arb | pg | -8,020 | -5,640 | -2,440 | -6,380 | -60 | +360 | +980 | +0 | +5,900 | -4,640 | -19,940 |
+| chem_fund | TA | -10,305 | -1,455 | +2,010 | -5,505 | -435 | +285 | +960 | +105 | -2,400 | -2,760 | -19,500 |
+| fund_v3 | c | +3,340 | -2,840 | +2,000 | -11,520 | -4,980 | -1,260 | -3,020 | +120 | -1,280 | +2,620 | -16,820 |
+| ks_branch | l | -7,616 | +96 | -4,568 | -2,316 | +160 | -20 | -108 | -152 | -156 | -1,100 | -15,780 |
 same holdings split as 'Live P&L by strategy'; summing a strategy's products reproduces its row there (trading / neither included as their own strategy). Full series: data/strategy_product_daily.csv
 
 ## Paper strategies (weight 0 in the forward book: tracked, not traded)
 | strategy | weight 0 since | bt since (full) | bt last 20d | drawdown now | worst before pause | 60d Sharpe | paper-live since (full) | paper days | book coverage |
 |---|---|---|---|---|---|---|---|---|---|
-| agri_event | 2026-11-02 | -8,030 | -94,440 | -151,660 | -149,845 | -2.70 | -9,215 | 10 | 100% |
+| agri_event | 2026-11-02 | -23,355 | -106,340 | -165,685 | -148,545 | -2.39 | -40,985 | 12 | 100% |
 paper-live = the strategy's own pinned full-size book of D-1 x the settlement-to-settlement move of D, priced like the live attribution, on contracts the day's state capture marks (coverage). Re-entry: owner's call, at an attended morning merge; reweighting is Execution/weights_forward.json + weights_changelog.csv.
 
 ## Backtest vintages (full series kept on every restatement)
@@ -203,30 +201,30 @@ expected on the CURRENT series minus expected on the as-shipped pins, live windo
 | strategy | restated |
 |---|---|
 | ks_branch | +65,633 |
-| fund_v3 | -42,308 |
+| fund_v3 | -42,249 |
 | china_pairs | -24,878 |
 | ks_ext | +6,911 |
 | chem_fund | -6,668 |
-| agri_event | +9,350 |
+| agri_event | +10,650 |
 | stat_arb | +12,379 |
-| all | +20,419 |
+| all | +21,778 |
 | strategy | vintages | latest | cause | commit | rows restated | net change (full size) |
 |---|---|---|---|---|---|---|
 | ks_branch | 2 | 20261102090932_cbbdd7664522.csv | unknown | cbbdd76 | 165 | +341,255 |
 | ks_ext | 2 | 20261102090932_1a03a09367cb.csv | unknown | 1a03a09 | 91 | +31,590 |
 | china_pairs | 2 | 20261102090932_51a17747e0e0.csv | unknown | 51a1774 | 44 | -46,815 |
-| chem_fund | 3 | 20261105091241_a98238f08285.csv | data | a98238f | 1 | -480 |
 | ks_outright | 1 | 20261111091151_49ac2cfb3881.csv | first | 49ac2cf | 0 | +0 |
 | fpe | 1 | 20261111091151_01eab32dfcbf.csv | first | 01eab32 | 0 | +0 |
-| agri_event | 11 | 20261116091117_8f0b7b90cc1f.csv | data | 8f0b7b9 | 7 | -1,750 |
-| fund_v3 | 5 | 20261116091117_0712a0472bd7.csv | data | 0712a04 | 4 | -11 |
 | stat_arb | 4 | 20261116091117_9f7e9a742805.csv | data | 9f7e9a7 | 3 | -3,932 |
+| chem_fund | 4 | 20261117091502_f7a9729c0604.csv | code | f7a9729 | 1 | +170 |
+| agri_event | 13 | 20261118090511_8f0b7b90cc1f.csv | data | 8f0b7b9 | 12 | -4,300 |
+| fund_v3 | 7 | 20261118090511_0712a0472bd7.csv | data | 0712a04 | 1 | +1,950 |
 full series: data/backtest/vintages/<strategy>/; index: data/backtest/vintages/index.csv
 
 ## Data health
-decision-price coverage (2026-11-16): 100% of held notional benchmarked (1 contract(s) unbenchmarked); 13 contract(s) (19%) first decided after the 0900 snap, so they straddle their own overnight leg
+decision-price coverage (2026-11-18): 100% of held notional benchmarked (0 contract(s) unbenchmarked); 13 contract(s) (20%) first decided after the 0900 snap, so they straddle their own overnight leg
 scale: 1 (since 2026-09-09)
-regime: forward (merged weighted book) since 2026-08-31; 50 forward day(s), 8 legacy day(s)
-merge weights (2026-11-16): ks_branch 0.8, fund_v3 2, china_pairs 1.5, ks_ext 0.25, chem_fund 1.5, agri_event 0, stat_arb 1, fpe 0.1, ks_outright 0.5
-as-shipped pins: 58 live day(s) pinned; current series diverges from pins on chem_fund: 30 day(s), max 9,725 CNY, fund_v3: 52 day(s), max 22,683 CNY, 3 NEW, ks_branch: 43 day(s), max 82,125 CNY, ks_ext: 35 day(s), max 42,170 CNY, stat_arb: 45 day(s), max 9,982 CNY, 2 NEW, china_pairs: 23 day(s), max 10,910 CNY, agri_event: 11 day(s), max 7,250 CNY; standing counts -- a divergence is announced as an alert once, the first run it appears, and kept here afterwards
-inbox ks summary mtime: 2026-11-16 05:57 UTC
+regime: forward (merged weighted book) since 2026-08-31; 52 forward day(s), 8 legacy day(s)
+merge weights (2026-11-18): ks_branch 0.8, fund_v3 2, china_pairs 1.5, ks_ext 0.25, chem_fund 1.5, agri_event 0, stat_arb 1, fpe 0.1, ks_outright 0.5
+as-shipped pins: 60 live day(s) pinned; current series diverges from pins on chem_fund: 30 day(s), max 9,725 CNY, fund_v3: 53 day(s), max 22,683 CNY, ks_branch: 43 day(s), max 82,125 CNY, ks_ext: 35 day(s), max 42,170 CNY, stat_arb: 45 day(s), max 9,982 CNY, china_pairs: 23 day(s), max 10,910 CNY, agri_event: 12 day(s), max 7,250 CNY, 1 NEW; standing counts -- a divergence is announced as an alert once, the first run it appears, and kept here afterwards
+inbox ks summary mtime: 2026-11-18 05:57 UTC
