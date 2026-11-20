@@ -135,7 +135,7 @@ def check_all(recon: pd.DataFrame, missing_days: list[str], scales: pd.DataFrame
                 f"{100 * benched / traded:.0f}% of traded notional had a "
                 f"shipped decision price (< {100 * C.SLIP_COVERAGE_MIN:.0f}%) "
                 f"-- slip_total does not measure the whole book; check the "
-                f"forward meta union on the advisor.")
+                f"forward meta union upstream.")
 
     # -- broker reconciliation --------------------------------------------
     summ = io_live.daily_summary()

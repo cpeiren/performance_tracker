@@ -337,7 +337,7 @@ def fills_by_run(day: str) -> dict[str, dict[str, float]]:
 
 
 def _cst_naive_from_epoch(epoch: float):
-    """Box clock is UTC; run ids and advisor generated_at are CST wall time."""
+    """Box clock is UTC; run ids and upstream generated_at are CST wall time."""
     import datetime as dt
     return (dt.datetime.fromtimestamp(epoch, dt.timezone.utc)
             .astimezone(dt.timezone(dt.timedelta(hours=8)))

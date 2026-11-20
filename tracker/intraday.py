@@ -36,7 +36,7 @@ import datetime as dt
 from . import io_live
 
 #: Decision stamped moments after the run began is still that run's decision
-#: (advisor generated_at vs executor run stamp; measured skew is seconds).
+#: (upstream generated_at vs executor run stamp; measured skew is seconds).
 BENCH_SKEW_SEC = 120.0
 
 
