@@ -1,7 +1,6 @@
 # Performance tracker - 2026-11-20   (reconciled through 2026-11-20)
 
 ## ALERTS
-- VINTAGE agri_event: 4 historical row(s) restated (net -475 CNY, cause data, commit 8f0b7b9) -- kept as vintages/agri_event/20261120091424_8f0b7b90cc1f.csv; the bridge keeps the as-shipped pins
 - WEIGHTS 2026-10-09: day's own merge weights not shipped yet -- carried forward from an earlier day.
 - WEIGHTS 2026-10-16: day's own merge weights not shipped yet -- carried forward from an earlier day.
 - WEIGHTS 2026-10-22: day's own merge weights not shipped yet -- carried forward from an earlier day.
@@ -17,7 +16,6 @@
 - SCALE CHANGE on 2026-08-27: now 0.2.
 - SCALE CHANGE on 2026-09-01: now 0.5.
 - SCALE CHANGE on 2026-09-09: now 1.
-- BACKTEST REVISED: agri_event -- 2 mature row(s) changed since last run (net +75 CNY, largest 2026-03-30 -15615 -> -15565; first 2026-01-06, last 2026-03-30). Regeneration upstream; baseline re-set.
 - SLIPPAGE 2026-11-20: 2 unbenchmarked leg(s), -25 CNY exec cost without a shipped decision price.
 - RESIDUAL 2026-08-27: -17267 CNY vs trailing median |resid| 2062, offset by neither neighbour (2026-08-26 +3749, 2026-08-31 -17348) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
 - RESIDUAL 2026-08-31: -17348 CNY vs trailing median |resid| 2277, offset by neither neighbour (2026-08-27 -17267, 2026-09-01 -8190) -- attribution quality changed. (A break-out that a neighbouring day mirrors is the backtest/live day-window straddle and is not alerted.)
